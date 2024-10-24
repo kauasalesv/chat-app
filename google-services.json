@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "163085396885",
+    "project_id": "chat-app-kaua",
+    "storage_bucket": "chat-app-kaua.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:163085396885:android:c00d3b653f6135d216a49c",
+        "android_client_info": {
+          "package_name": "chat.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCa0Lx3cyzPBz9eE10DuhvcOs3F4sm2GZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
