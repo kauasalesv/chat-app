@@ -73,7 +73,7 @@ const ChatMessages = ({ messages, contactEmail }) => {
               <View 
                   style={[
                     message.from === 'me' ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
-                    message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#A28B59' } : {}
+                    message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#565656' } : {}
                   ]}
                 >
                   <Text style={styles.chatMessagesMessageText}>{message.text}</Text>

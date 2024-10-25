@@ -22,12 +22,10 @@ const Chat = () => {
 
     useEffect(() => {
         const userEmail = auth.currentUser.email;
-    
-        // Registra o e-mail no servidor ao conectar
         socket.emit('register', userEmail);
     
         socket.on('receiveMessage', async (data) => {
-            console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}`);
+            //console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}`);
             const receivedMessage = { 
                 id: messages.length + 1,
                 text: data.message, 
@@ -60,7 +58,6 @@ const Chat = () => {
         // Envia a mensagem pelo Socket.io
         socket.emit('sendMessage', { message: messageText, recipientEmail: contactEmail, senderEmail: userEmail });
         setMessageText(''); // Limpa o campo de 
-        console.log("SSS")
     };
 
     const loadMyMessages = async () => {
@@ -79,7 +76,7 @@ const Chat = () => {
             }));
             setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
         } else {
-            console.log("Nenhuma mensagem encontrada para o usuário.");
+            //console.log("Nenhuma mensagem encontrada para o usuário.");
         }
     };
 
@@ -87,20 +84,49 @@ const Chat = () => {
         const chatDocId = `${contactEmail}:${auth.currentUser.email}`;
         const chatRef = doc(db, 'chats', chatDocId);
         const chatSnap = await getDoc(chatRef);
+    
         if (chatSnap.exists()) {
             const chatData = chatSnap.data();
+    
+            // Atualiza o status das mensagens carregadas para 'read'
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
                 text: msg.content,
                 time: msg.time,
                 from: 'other',
-                status: msg.status // Inclui o status
+                status: 'read' // Atualiza o status para 'read'
             }));
+    
+            // Atualiza o estado local
             setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
+    
+            // Atualiza o status das mensagens no Firestore
+            await updateMessagesStatusToRead(chatRef, chatData.messages);
         } else {
-            console.log("Nenhuma mensagem encontrada para o contato.");
+            //console.log("Nenhuma mensagem encontrada para o contato.");
         }
     };
+    
+    const updateMessagesStatusToRead = async (chatRef, messages) => {
+        try {
+            // Atualiza apenas as mensagens que estão com status diferente de 'read'
+            const updatedMessages = messages.map((msg) => {
+                if (msg.status !== 'read') {
+                    return { ...msg, status: 'read' };
+                }
+                return msg;
+            });
+    
+            // Atualiza o documento no Firestore
+            await updateDoc(chatRef, {
+                messages: updatedMessages
+            });
+    
+            //console.log("Status das mensagens atualizado para 'read'.");
+        } catch (error) {
+            console.error("Erro ao atualizar o status das mensagens no Firestore:", error);
+        }
+    };    
 
     useEffect(() => {
         loadMyMessages();

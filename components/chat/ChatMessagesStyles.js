@@ -10,7 +10,7 @@ export default StyleSheet.create({
 
   chatMessagesOtherMessage: {
     maxWidth: 300,  
-    backgroundColor: '#565656',
+    backgroundColor: '#A28B59',
     marginTop: 5,
     borderRadius: 10,
     padding: 10, 

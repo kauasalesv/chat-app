@@ -86,19 +86,24 @@ const HomeChats = ({ searchTerm }) => {
                                     style={styles.homeChatsUserImage} 
                                 />
                                 <Text style={styles.homeChatsName}>{contact.name}</Text>
-                                <Image 
-                                    source={require('../../assets/onlineImage.png')}
-                                    style={styles.homeChatsOnlineImage} 
-                                />
-                                {contact.pendingCount > 0 && ( // Exibe apenas se a contagem for maior que 0
-                                    <ImageBackground 
-                                        source={require('../../assets/notificationImage.png')}
-                                        style={styles.homeChatsNotificationContainer} 
-                                        resizeMode='contain'
-                                    >
-                                        <Text style={styles.homeChatsNotificationText}>{contact.pendingCount}</Text>
-                                    </ImageBackground>
-                                )}
+
+                                <View style={styles.homeChatsNotificationOnlineContainer}> 
+                                    {contact.pendingCount > 0 && ( // Exibe apenas se a contagem for maior que 0
+                                        <ImageBackground 
+                                            source={require('../../assets/notificationImage.png')}
+                                            style={styles.homeChatsNotificationContainer} 
+                                            resizeMode='contain'
+                                        >
+                                            <Text style={styles.homeChatsNotificationText}>{contact.pendingCount}</Text>
+                                        </ImageBackground>
+                                    )}
+                                    {/*
+                                    <Image 
+                                        source={require('../../assets/onlineImage.png')}
+                                        style={styles.homeChatsOnlineImage} 
+                                    />
+                                    */}
+                                </View>
                             </View>
                         </TouchableOpacity>
                     ))}

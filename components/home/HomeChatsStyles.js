@@ -33,11 +33,24 @@ export default StyleSheet.create({
         marginLeft: 20
     },
 
+    homeChatsLastMessage: {
+        color: '#fff',
+        fontSize: 12,
+        marginLeft: 20
+    },
+
+    homeChatsNotificationOnlineContainer: {
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 'auto',
+        marginRight: 10,
+        gap: 10
+    },
+
     homeChatsOnlineImage: {
         width: 10,
         height: 10,
-        marginLeft: 'auto',
-        marginRight: 20,
     },
 
     homeChatsNotificationContainer: {
@@ -47,13 +60,11 @@ export default StyleSheet.create({
         height: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'transparent'
     },
 
     homeChatsNotificationText: {
         color: 'white', 
         fontWeight: 'bold',
         fontSize: 10,
-        alignSelf: 'center',
     }
 });
