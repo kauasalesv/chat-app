@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, ScrollView, ImageBackground, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native'; 
-import { doc, getDoc } from 'firebase/firestore'; 
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; 
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase'; 
 import styles from './HomeChatsStyles';
 
@@ -33,32 +33,68 @@ const HomeChats = ({ searchTerm }) => {
         const userEmail = auth.currentUser.email;
 
         const updatedContacts = await Promise.all(contacts.map(async (contact) => {
-            const chatDocId = `${contact.email}:${userEmail}`; // Usando o email do contato
+            const chatDocId = `${contact.email}:${userEmail}`; 
             const chatRef = doc(db, 'chats', chatDocId);
             const chatSnap = await getDoc(chatRef);
 
             if (chatSnap.exists()) {
                 const chatData = chatSnap.data();
-                const pendingCount = chatData.messages.filter(msg => msg.status === 'pending').length; // Conta mensagens pendentes
-                return { ...contact, pendingCount }; // Adiciona a contagem ao contato
+                const pendingCount = chatData.messages.filter(msg => msg.status === 'pending').length; 
+                return { ...contact, pendingCount }; 
             } else {
-                //console.log(`Nenhuma mensagem encontrada para o contato ${contact.name}.`);
-                return { ...contact, pendingCount: 0 }; // Se não houver mensagens, contagem é 0
+                return { ...contact, pendingCount: 0 }; 
             }
         }));
 
-        setContacts(updatedContacts); // Atualiza o estado com os contatos e suas contagens de mensagens pendentes
+        setContacts(updatedContacts); 
     };
 
-    useEffect(() => {
-        fetchContacts();
-    }, []);
+    const updateContactsFromChats = async () => {
+        try {
+            const userEmail = auth.currentUser.email;
+            const userId = auth.currentUser.uid;
+            const userRef = doc(db, 'users', userId);
+            const contactsCollection = collection(db, 'chats');
+
+            const chatDocs = await getDocs(contactsCollection);
+            const userSnapshot = await getDoc(userRef);
+            const existingContacts = userSnapshot.exists() ? userSnapshot.data().contacts : [];
+            const newContacts = [];
+
+            for (let chatDoc of chatDocs.docs) {
+                const [email1, email2] = chatDoc.id.split(':');
+                if (email1 === userEmail || email2 === userEmail) {
+                    const contactEmail = email1 === userEmail ? email2 : email1;
+                    if (!existingContacts.some(contact => contact.email === contactEmail)) {
+                        newContacts.push({ email: contactEmail, name: contactEmail});
+                    }
+                }
+            }
+    
+            if (newContacts.length > 0) {
+                await updateDoc(userRef, {
+                    contacts: arrayUnion(...newContacts)
+                });
+                console.log('Novos contatos adicionados:', newContacts);
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar contatos a partir dos chats:', error);
+        }
+    };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            setLoading(true); // Define loading como true ao focar no componente
+            fetchContacts();
+            updateContactsFromChats();
+        }, [])
+    );
 
     useEffect(() => {
         if (!loading) {
-            loadMyMessages(); // Carrega mensagens após os contatos serem carregados
+            loadMyMessages();
         }
-    }, [contacts, loading]); // Recarrega mensagens sempre que os contatos mudarem
+    }, [contacts, loading]);
 
     const removeAccents = (str) => {
         return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -88,7 +124,7 @@ const HomeChats = ({ searchTerm }) => {
                                 <Text style={styles.homeChatsName}>{contact.name}</Text>
 
                                 <View style={styles.homeChatsNotificationOnlineContainer}> 
-                                    {contact.pendingCount > 0 && ( // Exibe apenas se a contagem for maior que 0
+                                    {contact.pendingCount > 0 && (
                                         <ImageBackground 
                                             source={require('../../assets/notificationImage.png')}
                                             style={styles.homeChatsNotificationContainer} 
@@ -97,21 +133,14 @@ const HomeChats = ({ searchTerm }) => {
                                             <Text style={styles.homeChatsNotificationText}>{contact.pendingCount}</Text>
                                         </ImageBackground>
                                     )}
-                                    {/*
-                                    <Image 
-                                        source={require('../../assets/onlineImage.png')}
-                                        style={styles.homeChatsOnlineImage} 
-                                    />
-                                    */}
                                 </View>
                             </View>
                         </TouchableOpacity>
                     ))}
-
                 </ScrollView>
             )}
         </View>
     );
 };
 
-export default HomeChats;
+export default HomeChats; 

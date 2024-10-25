@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
+import { auth, db } from '../../config/firebase'; 
 import styles from "./HomeStyles";
 
 import HomeUpBar from "../layout/HomeUpBar";
@@ -10,8 +11,8 @@ import HomeGroups from './HomeGroups';
 const Home = ( { route } ) => {
   const [activeButton, setActiveButton] = useState('chats');
   const [searchTerm, setSearchTerm] = useState(''); 
-  const { userEmail, userId } = route.params;
-  
+  const userEmail = auth.currentUser.email; // Obtenha o email do usuário autenticado
+  const userId = auth.currentUser.uid; // Obtenha o ID do usuário autenticado  
   return (
     <View style={styles.homeContainer}>
       <HomeUpBar 

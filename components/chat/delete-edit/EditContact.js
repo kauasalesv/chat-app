@@ -37,8 +37,10 @@ const EditContact = ({ route }) => {
                         contacts: arrayUnion({ name, email: contactEmail }) // Adiciona o contato atualizado
                     });
 
+                    console.log(name)
+
                     Alert.alert("Sucesso", "O contato foi atualizado com sucesso!");
-                    navigation.goBack(); // Volta após salvar as alterações
+                    navigation.navigate('Chat', { contactName: name, contactEmail: contactEmail, typeChat: 'chat' });
                 }
             }
         } catch (error) {
@@ -81,7 +83,7 @@ const EditContact = ({ route }) => {
                                     });
 
                                     Alert.alert("Sucesso", "O contato foi removido com sucesso!");
-                                    navigation.goBack(); // Volta após excluir o contato
+                                    navigation.navigate('Home');
                                 }
                             }
                         } catch (error) {

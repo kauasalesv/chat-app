@@ -29,9 +29,9 @@ io.on('connection', (socket) => {
         const recipientSocketId = userSockets[recipientEmail];
         if (recipientSocketId) {
             console.log(recipientSocketId);
+            await saveMessageToFirestore(message, senderEmail, recipientEmail); 
             io.to(recipientSocketId).emit('receiveMessage', { message, senderId: senderEmail });
             console.log(`Mensagem enviada para ${recipientEmail}: "${message}" de ${senderEmail}`);
-            await saveMessageToFirestore(message, senderEmail, recipientEmail); // Salva a mensagem no Firestore
         } else {
             console.log(`${recipientEmail} está offline, salvando a mensagem no Firestore.`);
             await saveMessageToFirestore(message, senderEmail, recipientEmail); // Salva a mensagem no Firestore
