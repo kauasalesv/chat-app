@@ -19,16 +19,17 @@ export default StyleSheet.create({
     },
 
     createGroupHead:{
-        width: 100,
+        width: 200,
         height: 100,
         alignSelf: 'center',
-        gap: 8
+        gap: 8,
     },
 
     createGroupHeadTittle: {
         color: '#fff',
         fontSize: 20,
         alignSelf: 'center',
+        textAlign: 'center'
     },
 
     createGroupHeadUserImage: {

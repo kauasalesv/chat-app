@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { View, Image, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { doc, getDoc } from 'firebase/firestore'; 
 import { auth, db } from '../../../config/firebase'; 
 import styles from "./AddContactsStyles";
 
 const AddContacts = () => {
     const navigation = useNavigation();
+    const route = useRoute();
+    const { groupParticipants = [] } = route.params || {}; // Define um valor padrão como um array vazio
 
     // Estados para armazenar os contatos, o termo de pesquisa, o carregamento e os contatos selecionados
     const [contacts, setContacts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
-    const [selectedContacts, setSelectedContacts] = useState([]);
+    const [selectedContacts, setSelectedContacts] = useState(groupParticipants); // Inicializa com groupParticipants
+
+    useEffect(() => {
+        setSelectedContacts(groupParticipants);
+    }, [groupParticipants]);
 
     // Função para remover acentos
     const removeAccents = (str) => {
@@ -52,17 +58,17 @@ const AddContacts = () => {
         return unsubscribe;
     }, [navigation]);
 
-    const toggleContactSelection = (contactId) => {
+    const toggleContactSelection = (contact) => {
         setSelectedContacts(prevSelectedContacts => {
-            if (prevSelectedContacts.includes(contactId)) {
-                // Se o contato já está selecionado, removê-lo
-                return prevSelectedContacts.filter(id => id !== contactId);
+            if (prevSelectedContacts.some(selected => selected.email === contact.email)) {
+                // Remove o contato se ele já estiver selecionado
+                return prevSelectedContacts.filter(selected => selected.email !== contact.email);
             } else {
-                // Caso contrário, adicionar o contato aos selecionados
-                return [...prevSelectedContacts, contactId];
+                // Adiciona o contato inteiro aos selecionados
+                return [...prevSelectedContacts, contact];
             }
         });
-    };
+    };    
 
     return (
         <View style={styles.addContactsContainer}>
@@ -101,15 +107,14 @@ const AddContacts = () => {
                     <ActivityIndicator size="large" color="#0000ff" />
                 ) : (
                     <ScrollView>
-                        
                         {filteredContacts.length > 0 ? (
                             filteredContacts.map(contact => (
                                 <TouchableOpacity
-                                    key={contact.id} // Certifique-se de que contact.id é realmente único
-                                    onPress={() => toggleContactSelection(contact.id)} // Alterna a seleção
+                                    key={contact.email}
+                                    onPress={() => toggleContactSelection(contact)}
                                     style={[
                                         styles.addContactsContactsContact,
-                                        selectedContacts.includes(contact.id) && { backgroundColor: 'rgba(89, 107, 178, 0.41)' } // Cor de fundo se selecionado
+                                        selectedContacts.some(selected => selected.email === contact.email) && { backgroundColor: 'rgba(89, 107, 178, 0.41)' } // Cor de fundo se selecionado
                                     ]}
                                 >
                                     <Image 
@@ -118,16 +123,19 @@ const AddContacts = () => {
                                     />
                                     <Text style={styles.addContactsContactsName}>{contact.name}</Text>
                                 </TouchableOpacity>
-                        ))
-                    ) : (
-                        <Text style={styles.addEditContactsNoResultsText}>Nenhum contato encontrado</Text>
-                    )}
+                            ))
+                        ) : (
+                            <Text style={styles.addEditContactsNoResultsText}>Nenhum contato encontrado</Text>
+                        )}
                     </ScrollView>
                 )}
             </View>
 
             <View style={styles.addContactsButtonContainer}>
-                <TouchableOpacity style={styles.addContactsSaveButton}>
+                <TouchableOpacity 
+                    style={styles.addContactsSaveButton}
+                    onPress={() => navigation.navigate('CreateGroup', { selectedContacts })} 
+                >
                     <Text style={styles.addContactsButtonTittle}>Adicionar</Text>
                 </TouchableOpacity>
             </View>
