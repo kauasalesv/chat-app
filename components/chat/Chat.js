@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { Buffer } from 'buffer';
+import { TextDecoder } from 'text-encoding';
 import io from 'socket.io-client';
 import styles from "./ChatStyles";
 
@@ -11,6 +13,7 @@ import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
 const socket = io('http://192.168.1.7:3000');
+const IDEA = require("idea-cipher");
 
 const Chat = () => {
     const [messages, setMessages] = useState([]);
@@ -74,9 +77,10 @@ const Chat = () => {
         setMessages((prevMessages) => [...prevMessages, newMessage]); // Adiciona a mensagem ao estado
 
         const userEmail = auth.currentUser.email;
+        const criptografia = await findExistingKey(messageText, userEmail, contactEmail);
 
         // Envia a mensagem pelo Socket.io
-        socket.emit('sendMessage', { message: messageText, recipientEmail: contactEmail, senderEmail: userEmail });
+        socket.emit('sendMessage', { message: criptografia[0], key: criptografia[1], recipientEmail: contactEmail, senderEmail: userEmail });
         setMessageText(''); // Limpa o campo de 
     };
 
@@ -89,7 +93,7 @@ const Chat = () => {
             const chatData = chatSnap.data();
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: msg.content,
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chatData.key)),
                 time: msg.time,
                 from: 'me',
                 status: msg.status // Inclui o status
@@ -111,7 +115,7 @@ const Chat = () => {
             // Atualiza o status das mensagens carregadas para 'read'
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: msg.content,
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chatData.key)),
                 time: msg.time,
                 from: 'other',
                 status: 'read' // Atualiza o status para 'read'
@@ -148,41 +152,89 @@ const Chat = () => {
         }
     };    
 
+    // Função para gerar uma chave IDEA (128 bits, 16 bytes)
+    function gerarChaveIDEA() {
+        // Em produção, use um gerador de chaves seguro
+        return Buffer.from(Array.from({ length: 16 }, () => Math.floor(Math.random() * 256)));
+    }
 
-    // Função para salvar mensagem no Firestore
-    const saveMessageToFirestore = async (message, senderEmail, recipientEmail, status) => {
+    // Função para criptografar a mensagem com IDEA
+    function criptografarIDEA(mensagem, chave) {
+        const idea = new IDEA(chave);
+        const mensagemBuffer = Buffer.from(mensagem, 'utf-8');
+        const criptografada = idea.encrypt(mensagemBuffer);
+        console.log("Mensagem criptografada (hex):", criptografada.toString('hex'));
+        return criptografada;
+    }
+
+    // Função para descriptografar a mensagem com IDEA
+    function descriptografarIDEA(criptografada, chave) {
+        const idea = new IDEA(chave);
+        const descriptografada = idea.decrypt(criptografada);
+        console.log("Mensagem descriptografada:", descriptografada.toString('utf-8'));
+        return descriptografada.toString('utf-8');
+    }
+
+    // Função para converter Uint8Array ou Buffer para base64
+    function toBase64(data) {
+        return Buffer.from(data).toString('base64');
+    }
+
+    // Função para converter base64 de volta para Uint8Array
+    function fromBase64(base64String) {
+        return new Uint8Array(Buffer.from(base64String, 'base64'));
+    }
+
+    const findExistingKey = async (message, senderEmail, recipientEmail) => {
         try {
-            // Cria o ID do documento com base nos e-mails do remetente e do destinatário
-            const chatDocId = `${senderEmail}:${recipientEmail}`;
-            const chatRef = doc(db, 'chats', chatDocId); // Referência ao documento na coleção 'chats'
+            // Definindo o ID do chat como `recipientEmail:userEmail`
+            const chatId1 = `${recipientEmail}:${senderEmail}`;
+            const chatId2 = `${senderEmail}:${recipientEmail}`;
 
-            // Verifica se o documento já existe
-            const chatSnap = await getDoc(chatRef);
+            // Referência ao documento do chat com o ID especificad
+            const chatDocRef1 = doc(db, 'chats', chatId1);
+            const chatDocRef2 = doc(db, 'chats', chatId2);
 
-            const messageData = {
-                content: message,
-                time: new Date(),
-                sender: senderEmail,
-                status: status
-            };
+            const chatDoc1 = await getDoc(chatDocRef1);
+            const chatDoc2 = await getDoc(chatDocRef2);
 
-            if (chatSnap.exists()) {
-                // O documento já existe, faz o push da nova mensagem no array de messages
-                await updateDoc(chatRef, {
-                    messages: arrayUnion(messageData) // Adiciona a nova mensagem ao array
-                });
-            } else {
-                // O documento não existe, cria um novo
-                await setDoc(chatRef, {
-                    messages: [messageData] // Cria o documento com o array de messages
-                });
+            // Verificar se o documento existe e retornar a chave
+            if (chatDoc1.exists()) {
+                //console.log("EXISTE 1");
+                const chatData = chatDoc1.data();
+
+                const chave = fromBase64(chatData.key);
+                const criptografada = criptografarIDEA(message, chave);
+
+                const array = [toBase64(criptografada), chatData.key]
+
+                return array
+
+            } else if (chatDoc2.exists()) {
+                //console.log("EXISTE 2");
+                const chatData = chatDoc2.data();
+
+                const chave = fromBase64(chatData.key);
+                const criptografada = criptografarIDEA(message, chave);
+
+                const array = [toBase64(criptografada), chatData.key]
+
+                return array 
             }
+            else {
+                //console.log("NÃO EXISTE");
+                const chave = gerarChaveIDEA();
+                const criptografada = criptografarIDEA(message, chave);
 
-            console.log(`Mensagem salva no Firestore para ${recipientEmail}`);
+                const array = [toBase64(criptografada), toBase64(chave)]
+
+                return array
+            }
         } catch (error) {
-            console.error("Erro ao salvar mensagem no Firestore:", error);
+            console.error("Erro ao buscar a chave existente:", error);
+            return null;
         }
-    };
+    }
 
     useEffect(() => {
         loadMyMessages();
