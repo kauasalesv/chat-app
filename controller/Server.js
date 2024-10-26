@@ -32,7 +32,7 @@ io.on('connection', (socket) => {
         if (recipientSocketId) {
             console.log(recipientSocketId);
             await saveMessageToFirestore(message, key, senderEmail, recipientEmail); 
-            io.to(recipientSocketId).emit('receiveMessage', { message, senderId: senderEmail });
+            io.to(recipientSocketId).emit('receiveMessage', { message, key, senderId: senderEmail });
             console.log(`Mensagem enviada para ${recipientEmail}: "${message}" de ${senderEmail}`);
         } else {
             console.log(`${recipientEmail} está offline, persistindo a mensagem no Firestore.`);
@@ -90,6 +90,11 @@ io.on('connection', (socket) => {
             console.error("Erro ao salvar mensagem no Firestore:", error);
         }
     };
+
+    // Função para converter Uint8Array ou Buffer para base64
+    function toBase64(data) {
+        return Buffer.from(data).toString('base64');
+    }
 
 server.listen(3000, () => {
     console.log('Servidor rodando na porta 3000');

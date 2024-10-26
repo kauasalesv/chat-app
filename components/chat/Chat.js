@@ -28,10 +28,14 @@ const Chat = () => {
         socket.emit('register', userEmail);
     
         socket.on('receiveMessage', async (data) => {
-            console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}`);
+            console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}; chave: ${data.key}`);
+            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(data.key))
+
+            console.log(message);
+
             const receivedMessage = { 
                 id: messages.length + 1,
-                text: data.message, 
+                text: message, 
                 time: new Date(), 
                 from: 'other' 
             };
