@@ -1,42 +1,62 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
-import { doc, updateDoc } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
+import { View, Text, ScrollView } from 'react-native';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import styles from './ChatMessagesStyles';
 
-const ChatMessages = ({ messages, contactEmail }) => {
+const ChatMessages = ({ messages }) => {
+  const navigation = useNavigation();
   const scrollViewRef = useRef();
-  const [loading, setLoading] = useState(false);
-    
-  // Função para garantir que o timestamp seja convertido corretamente
+  const [contacts, setContacts] = useState([]);
+
   const getMessageTime = (time) => {
-    // Se for um objeto do Firebase (com 'seconds'), converte para Date
     if (time && time.seconds) {
       return new Date(time.seconds * 1000);
     }
-    // Se for uma string ISO 8601, converte diretamente para Date
     if (typeof time === 'string') {
       return new Date(time);
     }
-    // Caso não tenha tempo definido, retorna a data atual
     return new Date();
   };
 
-  // Faz uma cópia das mensagens antes de ordenar
   const sortedMessages = [...messages].sort((a, b) => {
     const timeA = getMessageTime(a.time);
     const timeB = getMessageTime(b.time);
     return timeA - timeB;
   });
 
-  // Função para rolar para o final do ScrollView
   const scrollToBottom = () => {
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollToEnd({ animated: false });
     }
   };
 
-  // Efeito para rolar para o final quando as mensagens mudam
+  const fetchContacts = async () => {
+    try {
+      const userId = auth.currentUser.uid; // Obtém o ID do usuário autenticado
+      const userRef = doc(db, 'users', userId); // Referência ao documento do usuário
+      const userSnap = await getDoc(userRef); // Busca os dados do usuário
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        setContacts(userData.contacts || []); // Define os contatos (ou array vazio se não houver contatos)
+      } else {
+        console.log("Documento do usuário não encontrado");
+      }
+    } catch (error) {
+      console.error("Erro ao buscar contatos:", error);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchContacts(); // Recarrega os contatos quando a tela é focada
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollToBottom();
@@ -47,47 +67,55 @@ const ChatMessages = ({ messages, contactEmail }) => {
     };
   }, [messages]);
 
-
   return (
     <View style={styles.chatMessagesContainer}>
-        <ScrollView ref={scrollViewRef}>
-          {sortedMessages.map((message, index) => {
-            const isLastMessageFromSender =
-              (index === sortedMessages.length - 1) || 
-              (sortedMessages[index + 1].from !== message.from);
+      <ScrollView ref={scrollViewRef}>
+        {sortedMessages.map((message, index) => {
+          const isLastMessageFromSender =
+            (index === sortedMessages.length - 1) || 
+            (sortedMessages[index + 1].from !== message.from);
 
-            // Gera uma chave única para cada mensagem
-            const uniqueKey = `${message.id || index}-${message.time ? message.time.seconds || message.time : Date.now()}`;
+          const uniqueKey = `${message.id || index}-${message.time ? message.time.seconds || message.time : Date.now()}`;
+          const messageTime = getMessageTime(message.time);
 
-            // Obtem o tempo da mensagem
-            const messageTime = getMessageTime(message.time);
+          // Verifica se o sender está na lista de contatos
+          const contact = contacts.find(contact => contact.email === message.sender);
 
-            return (
-              <View key={uniqueKey}>
-                {(index === 0 || !sortedMessages[index - 1].time) && messageTime ? (
-                  <Text style={styles.chatMessagesDateText}>
-                    {messageTime.toLocaleDateString()}
-                  </Text>
-                ) : null}
+          // Formata a data para comparação
+          const messageDate = messageTime.toLocaleDateString();
+          const showDate = index === 0 || messageDate !== getMessageTime(sortedMessages[index - 1].time).toLocaleDateString();
+
+          return (
+            <View key={uniqueKey}>
+              {showDate && (
+                <Text style={styles.chatMessagesDateText}>
+                  {messageDate}
+                </Text>
+              )}
 
               <View 
-                  style={[
-                    message.from === 'me' ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
-                    message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#565656' } : {}
-                  ]}
-                >
-                  <Text style={styles.chatMessagesMessageText}>{message.text}</Text>
-                  <Text style={styles.chatMessagesTimestamp}>
-                    {isLastMessageFromSender && messageTime && (
-                      <>{/* Apenas exibe a hora se for a última mensagem do remetente */}</>
-                    )}
-                    {messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                style={[
+                  message.from === 'me' ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
+                  message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#565656' } : {}
+                ]}
+              >
+                {message.from === 'other' && message.sender ? (
+                  <Text style={styles.chatMessagesSenderEmail}>
+                    {contact ? contact.name : message.sender} {/* Renderiza o nome do contato ou o email do sender */}
                   </Text>
-                </View>
+                ) : null}
+                <Text style={styles.chatMessagesMessageText}>{message.text}</Text>
+                <Text style={styles.chatMessagesTimestamp}>
+                  {isLastMessageFromSender && messageTime && (
+                    <>{/* Apenas exibe a hora se for a última mensagem do remetente */}</>
+                  )}
+                  {messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
               </View>
-            );
-          })}
-        </ScrollView>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 };

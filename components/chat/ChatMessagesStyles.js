@@ -35,11 +35,17 @@ export default StyleSheet.create({
     color: '#fff',  
     fontSize: 16,
     alignSelf: 'center',
-    marginTop: 10
+    marginTop: 10,
+    marginBottom: 10,
   },
 
   chatMessagesTimestamp: {
     color: '#373737',  
     fontSize: 10,
+  },
+
+  chatMessagesSenderEmail: {
+    color: "#373737",
+    fontWeight: '900'
   }
 });

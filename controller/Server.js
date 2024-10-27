@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, arrayUnion } = require('firebase/firestore'); // Importar Firestore
-const { db } = require('../config/firebase'); // Importar configuração do Firebase
+const { auth, db } = require('../config/firebase'); // Importar configuração do Firebase
 const { Buffer } =  require('buffer');
 const { TextDecoder } = require('text-encoding');
 
@@ -38,6 +38,38 @@ io.on('connection', (socket) => {
             console.log(`${recipientEmail} está offline, persistindo a mensagem no Firestore.`);
             await saveMessageToFirestore(message, key, senderEmail, recipientEmail); // Salva a mensagem no Firestore
         }
+    });
+
+    // Envio de mensagem para um grupo
+    socket.on('sendGroupMessage', async (data) => {
+        const { message, key, senderEmail, groupId } = data;
+        console.log(`Mensagem (grupo) recebida no servidor:`, data);
+
+        // Salva a mensagem no Firestore
+        await saveGroupMessageToFirestore(message, key, senderEmail, groupId);
+
+        // Envia a mensagem para todos os participantes conectados do grupo
+        const groupMembers = await getGroupMembers(groupId, senderEmail);
+        console.log(userSockets);
+        console.log(groupMembers);
+        
+        groupMembers.forEach((memberEmail) => {
+            const memberSocketId = userSockets[memberEmail];
+            console.log(`ID do socket para ${memberEmail}:`, memberSocketId);
+            
+            if (memberSocketId) {
+                if (memberEmail !== senderEmail) {
+                    io.to(memberSocketId).emit('receiveGroupMessage', { message, key, senderId: senderEmail, groupId });
+                    console.log(`Mensagem enviada para ${memberEmail} no grupo ${groupId}`);
+                } else {
+                    console.log(`Mensagem não enviada para ${memberEmail} pois é o remetente`);
+                }
+            } else {
+                console.log(`Nenhum socket encontrado para ${memberEmail}`); // Log para sockets não encontrados
+            }
+        });
+        
+        
     });
 
     socket.on('disconnect', () => {
@@ -91,10 +123,53 @@ io.on('connection', (socket) => {
         }
     };
 
-    // Função para converter Uint8Array ou Buffer para base64
-    function toBase64(data) {
-        return Buffer.from(data).toString('base64');
+    // Função para salvar mensagem de grupo no Firestore
+    const saveGroupMessageToFirestore = async (message, key, senderEmail, groupId) => {
+        try {
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+
+            const messageData = {
+                content: message,
+                time: new Date(),
+                sender: senderEmail,
+                status: 'read',
+            };
+
+            if (groupSnap.exists()) {
+                await updateDoc(groupRef, {
+                    messages: arrayUnion(messageData) 
+                });
+            } else {
+                await setDoc(groupRef, {
+                    messages: [messageData] 
+                });
+            }
+
+            console.log(`Mensagem de grupo persistida no Firestore para o grupo ${groupId}`);
+        } catch (error) {
+            console.error("Erro ao salvar mensagem de grupo no Firestore:", error);
+        }
+    };
+
+// Função para obter os membros do grupo a partir do Firestore
+const getGroupMembers = async (groupId, authenticatedEmail) => {
+    const groupRef = doc(db, 'groups', groupId);
+    const groupSnap = await getDoc(groupRef);
+
+    if (groupSnap.exists()) {
+        const groupData = groupSnap.data();
+        // Filtra os membros para remover o e-mail do usuário autenticado
+        const members = groupData.members || [];
+
+        // Extraí os e-mails dos objetos e filtra o e-mail autenticado
+        return members
+            .map(member => member.email) // Mapeia para um array de e-mails
+            .filter(email => email !== authenticatedEmail); // Remove o e-mail do usuário autenticado
     }
+    return [];
+};
+
 
 server.listen(3000, () => {
     console.log('Servidor rodando na porta 3000');

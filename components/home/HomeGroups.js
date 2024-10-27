@@ -50,7 +50,7 @@ const HomeGroups = ({ searchTerm }) => {
     );
 
     const handleGroupPress = (group) => {
-        navigation.navigate('Chat', { typeChat: 'group', groupId: group.id }); // Passa o tipo de chat e ID do grupo
+        navigation.navigate('ChatGroup', { typeChat: 'group', groupId: group.id, groupName: group.name, groupKey: group.key }); // Passa o tipo de chat e ID do grupo
     };
 
     return (

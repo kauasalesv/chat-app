@@ -43,7 +43,7 @@ const CreateGroup = () => {
 
         try {
             const groupId = doc(collection(db, 'groups')).id; // Gera um ID único para o grupo
-            const key = toBase64(gerarChaveIDEA())
+            const k = toBase64(gerarChaveIDEA());
             const groupData = {
                 name: groupName,
                 createdBy: auth.currentUser.email,

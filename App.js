@@ -10,6 +10,7 @@ import SignUp from './components/authentication/SignUp';
 import SignIn from './components/authentication/SignIn';
 import Home from './components/home/Home';
 import Chat from './components/chat/Chat';
+import ChatGroup from './components/chat/ChatGroup';
 import CreateContact from './components/home/create-add/CreateContact';
 import CreateGroup from './components/home/create-add/CreateGroup';
 import AddContacts from './components/home/create-add/AddContacts';
@@ -79,6 +80,7 @@ export default function App() {
         <Stack.Screen name="MyUser" component={MyUser} options={{ headerShown: false, animationEnabled: false }} />
         {/* Tela Chat */}
         <Stack.Screen name="Chat" component={Chat} options={{ headerShown: false, animationEnabled: false }} />
+        <Stack.Screen name="ChatGroup" component={ChatGroup} options={{ headerShown: false, animationEnabled: false }} />
         <Stack.Screen name="EditContact" component={EditContact} options={{ headerShown: false, animationEnabled: false }} />
         <Stack.Screen name="EditGroup" component={EditGroup} options={{ headerShown: false, animationEnabled: false }} />
         <Stack.Screen name="AddEditContacts" component={AddEditContacts} options={{ headerShown: false, animationEnabled: false }} />

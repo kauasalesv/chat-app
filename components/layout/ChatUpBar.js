@@ -42,7 +42,7 @@ const ChatUpBar = ({ typeChat, contactName, contactEmail }) => {
         />
         
         {typeChat === 'group' ? (
-          <Text style={styles.chatUpBarName}>Grupo</Text>
+          <Text style={styles.chatUpBarName}>{contactName}</Text>
         ) : (
           <Text style={styles.chatUpBarName}>{contactName}</Text>
         )}
