@@ -37,12 +37,6 @@ export default StyleSheet.create({
         width: 10,
         height: 10,
         marginLeft: 'auto',
-    },
-
-    homeGroupsOnlineImage: {
-        width: 10,
-        height: 10,
-        marginLeft: 'auto',
         marginRight: 20,
     },
 
@@ -53,7 +47,8 @@ export default StyleSheet.create({
         height: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
+        marginLeft: 'auto'
     },
 
     homeGroupsNotificationText: {
