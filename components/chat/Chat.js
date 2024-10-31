@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocs, where, query, collection, arrayUnion } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Buffer } from 'buffer';
 import { TextDecoder } from 'text-encoding';
+import Rsa from 'react-native-rsa-native';
+import * as Keychain from 'react-native-keychain';
 import io from 'socket.io-client';
 import styles from "./ChatStyles";
 
@@ -23,13 +25,21 @@ const Chat = () => {
     const navigation = useNavigation();
     const { typeChat, contactName, contactEmail } = route.params;
 
+    const user = auth.currentUser;
+
     useEffect(() => {
         const userEmail = auth.currentUser.email;
         socket.emit('register', userEmail);
     
         socket.on('receiveMessage', async (data) => {
-            console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}; chave: ${data.key}`);
-            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(data.key))
+            console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}; chave: ${data.recipientKey}`);
+
+            //message, senderKey, recipientKey, senderId: senderEmail
+
+            const myPriviteKey = await getPrivateKey(user.uid);
+            const chaveDescriptografada = await descriptografarRSA(data.recipientKey, myPriviteKey);
+
+            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada))
 
             const receivedMessage = { 
                 id: messages.length + 1,
@@ -79,10 +89,12 @@ const Chat = () => {
         setMessages((prevMessages) => [...prevMessages, newMessage]); // Adiciona a mensagem ao estado
 
         const userEmail = auth.currentUser.email;
-        const criptografia = await findExistingKey(messageText, userEmail, contactEmail);
+        const myPriviteKey = await getPrivateKey(user.uid);
+
+        const criptografia = await findExistingKey(messageText, userEmail, contactEmail, myPriviteKey);
 
         // Envia a mensagem pelo Socket.io
-        socket.emit('sendMessage', { message: criptografia[0], key: criptografia[1], recipientEmail: contactEmail, senderEmail: userEmail });
+        socket.emit('sendMessage', { message: criptografia[0], senderKey: criptografia[1], recipientKey: criptografia[2], recipientEmail: contactEmail, senderEmail: userEmail });
         setMessageText(''); // Limpa o campo de 
     };
 
@@ -91,11 +103,16 @@ const Chat = () => {
         const chatDocId = `${userEmail}:${contactEmail}`;
         const chatRef = doc(db, 'chats', chatDocId);
         const chatSnap = await getDoc(chatRef);
+
         if (chatSnap.exists()) {
             const chatData = chatSnap.data();
+
+            const myPriviteKey = await getPrivateKey(user.uid);
+            const chaveDescriptografada = await descriptografarRSA(chatData.senderKey, myPriviteKey);
+
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chatData.key)),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada)),
                 time: msg.time,
                 from: 'me',
                 status: msg.status // Inclui o status
@@ -110,14 +127,17 @@ const Chat = () => {
         const chatDocId = `${contactEmail}:${auth.currentUser.email}`;
         const chatRef = doc(db, 'chats', chatDocId);
         const chatSnap = await getDoc(chatRef);
-    
+
         if (chatSnap.exists()) {
             const chatData = chatSnap.data();
     
+            const myPriviteKey = await getPrivateKey(user.uid);
+            const chaveDescriptografada = await descriptografarRSA(chatData.recipientKey, myPriviteKey);
+
             // Atualiza o status das mensagens carregadas para 'read'
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chatData.key)),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada)),
                 time: msg.time,
                 from: 'other',
                 status: 'read' // Atualiza o status para 'read'
@@ -187,7 +207,27 @@ const Chat = () => {
         return new Uint8Array(Buffer.from(base64String, 'base64'));
     }
 
-    const findExistingKey = async (message, senderEmail, recipientEmail) => {
+    // Função para descriptografar uma mensagem
+    const descriptografarRSA = async (encryptedMessage, privateKey) => {
+        try {
+        const decrypted = await Rsa.decrypt(encryptedMessage, privateKey);
+        return decrypted;
+        } catch (error) {
+        console.error('Erro ao descriptografar a mensagem:', error);
+        }
+    };
+
+    // Função para criptografar uma mensagem
+    const criptografarRSA = async (message, publicKey) => {
+        try {
+        const encrypted = await Rsa.encrypt(message, publicKey);
+        return encrypted;
+        } catch (error) {
+        console.error('Erro ao criptografar a mensagem:', error);
+        }
+    };
+
+    const findExistingKey = async (message, senderEmail, recipientEmail, myPriviteKey) => {
         try {
             // Definindo o ID do chat como `recipientEmail:userEmail`
             const chatId1 = `${recipientEmail}:${senderEmail}`;
@@ -200,15 +240,26 @@ const Chat = () => {
             const chatDoc1 = await getDoc(chatDocRef1);
             const chatDoc2 = await getDoc(chatDocRef2);
 
+            //const myPriviteKey = await getPrivateKey(user.uid);
+
+            const senderPublicKey = await getMyPublicKey();
+            const recipientPublicKey = await getContactPublicKey(recipientEmail);
+
             // Verificar se o documento existe e retornar a chave
             if (chatDoc1.exists()) {
-                //console.log("EXISTE 1");
+                console.log("EXISTE 1");
                 const chatData = chatDoc1.data();
 
-                const chave = fromBase64(chatData.key);
+                const chaveDescriptografada = await descriptografarRSA(chatData.recipientKey, myPriviteKey);
+
+                const chave = fromBase64(chaveDescriptografada);
                 const criptografada = criptografarIDEA(message, chave);
 
-                const array = [toBase64(criptografada), chatData.key]
+                // CRIPTOGRAFAR CHAVE
+                const senderKey = await criptografarRSA(toBase64(chave), senderPublicKey);
+                const recipientKey = await criptografarRSA(toBase64(chave), recipientPublicKey);
+
+                const array = [toBase64(criptografada), senderKey, recipientKey];
 
                 return array
 
@@ -216,10 +267,16 @@ const Chat = () => {
                 //console.log("EXISTE 2");
                 const chatData = chatDoc2.data();
 
-                const chave = fromBase64(chatData.key);
+                const chaveDescriptografada = await descriptografarRSA(chatData.senderKey, myPriviteKey);
+
+                const chave = fromBase64(chaveDescriptografada);
                 const criptografada = criptografarIDEA(message, chave);
 
-                const array = [toBase64(criptografada), chatData.key]
+                // CRIPTOGRAFAR CHAVE
+                const senderKey = await criptografarRSA(toBase64(chave), senderPublicKey);
+                const recipientKey = await criptografarRSA(toBase64(chave), recipientPublicKey);
+
+                const array = [toBase64(criptografada), senderKey, recipientKey];
 
                 return array 
             }
@@ -228,7 +285,11 @@ const Chat = () => {
                 const chave = gerarChaveIDEA();
                 const criptografada = criptografarIDEA(message, chave);
 
-                const array = [toBase64(criptografada), toBase64(chave)]
+                // CRIPTOGRAFAR CHAVE
+                const senderKey = await criptografarRSA(toBase64(chave), senderPublicKey);
+                const recipientKey = await criptografarRSA(toBase64(chave), recipientPublicKey);
+
+                const array = [toBase64(criptografada), senderKey, recipientKey];
 
                 return array
             }
@@ -238,9 +299,66 @@ const Chat = () => {
         }
     }
 
+    const getContactPublicKey = async (contactEmail) => {
+        // Buscar o usuário correspondente ao contactEmail
+        const usersRef = collection(db, 'users'); 
+        const q = query(usersRef, where('email', '==', contactEmail)); 
+
+        const querySnapshot = await getDocs(q); 
+        let recipientPublicKey = null;
+
+        // Verifique se existem documentos retornados pela consulta
+        if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            recipientPublicKey = userDoc.data().publicKey; // Acesse a chave pública
+
+            return recipientPublicKey;
+
+        } else {
+            console.log("Nenhum usuário encontrado com esse e-mail.");
+            return null; // Retorna null se o usuário não for encontrado
+        }
+    }
+
+    const getMyPublicKey = async () => {
+        try {
+            // Obtenha o UID do usuário autenticado
+            const userId = auth.currentUser.uid; 
+            const userDocRef = doc(db, 'users', userId); // Referência direta ao documento do usuário
+            const userDoc = await getDoc(userDocRef); // Obtém o documento
+    
+            if (userDoc.exists()) {
+                return userDoc.data().publicKey; // Acesse a chave pública
+            } else {
+                console.log("Documento do usuário não encontrado.");
+                return null; // Retorna null se o documento não existir
+            }
+        } catch (error) {
+            console.error("Erro ao buscar minha chave pública:", error);
+            return null; // Retorna null em caso de erro
+        }
+    };
+
+    const getPrivateKey = async (userId) => {
+        try {
+            const credentials = await Keychain.getGenericPassword({
+                service: `privateKey_${userId}`, // Adicione o serviço aqui
+            });
+            if (credentials) {
+                return credentials.password; // Retorna a chave privada
+            } else {
+                console.log('Nenhuma chave privada encontrada.');
+                return null;
+            }
+        } catch (error) {
+            console.error('Erro ao recuperar a chave privada:', error);
+        }
+    };
+
     useEffect(() => {
         loadMyMessages();
         loadContactMessages();
+        getPrivateKey(user.uid);
     }, []);
 
     useEffect(() => {

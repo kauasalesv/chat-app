@@ -4,6 +4,8 @@ import { useNavigation } from '@react-navigation/native'; // Importação para n
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { setDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase'; 
+import Rsa from 'react-native-rsa-native';
+import * as Keychain from 'react-native-keychain';
 import styles from './SignUpStyles';
 
 const SignUp = () => {
@@ -23,8 +25,12 @@ const SignUp = () => {
                 const user = userCredential.user;
                 console.log("Cadastro bem-sucedido:", user);
     
+                const { publicKey, privateKey } = await generateKeys();
+                await savePrivateKey(user.uid, privateKey);
+
                 const userDoc = {
                     email: user.email,
+                    publicKey: publicKey,
                     contacts: [] // Inicializa como um array vazio
                 };
     
@@ -47,6 +53,46 @@ const SignUp = () => {
             });
     };
         
+    // Função para gerar chaves RSA
+    const generateKeys = async () => {
+        try {
+        const keys = await Rsa.generateKeys(2048);
+        return {
+            publicKey: keys.public,
+            privateKey: keys.private,
+        };
+        } catch (error) {
+        console.error('Erro ao gerar chaves RSA:', error);
+        }
+    };
+
+    const savePrivateKey = async (userId, privateKey) => {
+        try {
+            await Keychain.setGenericPassword(`privateKey_${userId}`, privateKey, {
+                service: `privateKey_${userId}`, // Adicione o serviço aqui
+            });
+            console.log('Chave privada salva com sucesso!');
+        } catch (error) {
+            console.error('Erro ao salvar a chave privada:', error);
+        }
+    };    
+    
+    /*/ Gerar chaves
+    const { publicKey, privateKey } = await generateKeys();
+    console.log('Chave Pública:', publicKey);
+    console.log('Chave Privada:', privateKey);
+  
+    // Mensagem para criptografar
+    const message = 'Esta é uma mensagem secreta.';
+  
+    // Criptografar mensagem
+    const encryptedMessage = await encryptMessage(message, publicKey);
+    console.log('Mensagem Criptografada:', encryptedMessage);
+  
+    // Descriptografar mensagem
+    const decryptedMessage = await decryptMessage(encryptedMessage, privateKey);
+    console.log('Mensagem Descriptografada:', decryptedMessage);*/
+
 
     return (
         <ScrollView style={styles.signUpContainer}>

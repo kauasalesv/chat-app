@@ -24,19 +24,22 @@ io.on('connection', (socket) => {
 
     // Escuta por mensagens enviadas por um usuário
     socket.on('sendMessage', async (data) => {
-        const { message, key, senderEmail, recipientEmail } = data;
+        const { message, senderKey, recipientKey, senderEmail, recipientEmail } = data;
+
         console.log(`Mensagem recebida no servidor:`, data); // Log para ver a mensagem recebida
 
         // Envia a mensagem ao usuário específico pelo email
         const recipientSocketId = userSockets[recipientEmail];
         if (recipientSocketId) {
             console.log(recipientSocketId);
-            await saveMessageToFirestore(message, key, senderEmail, recipientEmail); 
-            io.to(recipientSocketId).emit('receiveMessage', { message, key, senderId: senderEmail });
+            await saveMessageToFirestore(message, senderKey, recipientKey, senderEmail, recipientEmail); 
+
+            io.to(recipientSocketId).emit('receiveMessage', { message, senderKey, recipientKey, senderId: senderEmail });
+
             console.log(`Mensagem enviada para ${recipientEmail}: "${message}" de ${senderEmail}`);
         } else {
             console.log(`${recipientEmail} está offline, persistindo a mensagem no Firestore.`);
-            await saveMessageToFirestore(message, key, senderEmail, recipientEmail); // Salva a mensagem no Firestore
+            await saveMessageToFirestore(message, senderKey, recipientKey, senderEmail, recipientEmail);
         }
     });
 
@@ -86,7 +89,7 @@ io.on('connection', (socket) => {
 });
 
     // Função para salvar mensagem no Firestore
-    const saveMessageToFirestore = async (message, key, senderEmail, recipientEmail) => {
+    const saveMessageToFirestore = async (message, senderKey, recipientKey, senderEmail, recipientEmail) => {
         try {
             // Cria o ID do documento com base nos e-mails do remetente e do destinatário
             const chatDocId = `${senderEmail}:${recipientEmail}`;
@@ -105,14 +108,16 @@ io.on('connection', (socket) => {
             if (chatSnap.exists()) {
                 // O documento já existe, faz o push da nova mensagem no array de messages
                 await updateDoc(chatRef, {
-                    key : key,
+                    senderKey: senderKey,
+                    recipientKey: recipientKey,
                     messages: arrayUnion(messageData) // Adiciona a nova mensagem ao array
                 });
             } else {
                 // O documento não existe, cria um novo
                 console.log(messageData);
                 await setDoc(chatRef, {
-                    key : key,
+                    senderKey: senderKey,
+                    recipientKey: recipientKey,
                     messages: [messageData] // Cria o documento com o array de messages
                 });
             }
