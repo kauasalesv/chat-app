@@ -1,15 +1,15 @@
 {
   "name": "chat-app",
   "version": "1.0.0",
-  "main": "expo/AppEntry.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.24.0",
+    "@react-native-firebase/app": "^21.2.0",
     "@react-native-firebase/firestore": "^21.2.0",
     "@react-native-google-signin/google-signin": "^13.1.0",
     "@react-navigation/native": "^6.1.18",
@@ -24,6 +24,9 @@
     "idea-cipher": "^1.0.1",
     "react": "18.2.0",
     "react-native": "0.74.5",
+    "react-native-gesture-handler": "^2.20.2",
+    "react-native-keychain": "^9.1.0",
+    "react-native-rsa-native": "^2.0.5",
     "react-native-safe-area-context": "^4.11.1",
     "react-native-screens": "^3.34.0",
     "socket.io": "^4.8.0",

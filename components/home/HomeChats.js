@@ -100,9 +100,14 @@ const HomeChats = ({ searchTerm }) => {
         return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     };
 
-    const filteredContacts = contacts.filter(contact => 
-        removeAccents(contact.name.toLowerCase()).includes(removeAccents(searchTerm.toLowerCase()))
-    );
+    const filteredContacts = contacts.filter(contact => {
+        // Verifica se contact.name e searchTerm são definidos antes de aplicar toLowerCase
+        if (contact.name && searchTerm) {
+            return removeAccents(contact.name.toLowerCase()).includes(removeAccents(searchTerm.toLowerCase()));
+        }
+        return true; // Retorna true para manter o contato na lista se searchTerm não for definido
+    });
+    
 
     const handleContactPress = (contact) => {
         navigation.navigate('Chat', { typeChat: 'chat', contactName: contact.name, contactEmail: contact.email });
