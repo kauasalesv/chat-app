@@ -23,8 +23,10 @@ const SignUp = () => {
         createUserWithEmailAndPassword(auth, email, password)
             .then(async (userCredential) => {
                 const user = userCredential.user;
-                console.log("Cadastro bem-sucedido:", user);
-    
+                console.log("\n\n");
+                console.log("\x1b[33m", "Cadastro bem-sucedido:");
+                console.log(user);
+                
                 const { publicKey, privateKey } = await generateKeys();
                 await savePrivateKey(user.uid, privateKey);
 
@@ -37,7 +39,12 @@ const SignUp = () => {
                 const userRef = doc(db, 'users', user.uid);
                 await setDoc(userRef, userDoc)
                     .then(() => {
-                        console.log("Usuário salvo com sucesso!");
+                        console.log("\x1b[33m", "Usuário autenticado com sucesso!");
+                        console.log("\x1b[33m", "Chave Pública:")
+                        console.log(publicKey);
+                        console.log("\x1b[33m", "Chave Privada:")
+                        console.log(privateKey);
+                        console.log("\n\n");
                     })
                     .catch((error) => {
                         console.error("Erro ao salvar usuário:", error);
@@ -71,7 +78,8 @@ const SignUp = () => {
             await Keychain.setGenericPassword(`privateKey_${userId}`, privateKey, {
                 service: `privateKey_${userId}`, // Adicione o serviço aqui
             });
-            console.log('Chave privada salva com sucesso!');
+            console.log("\x1b[33m", 'Chave privada salva com sucesso!');
+
         } catch (error) {
             console.error('Erro ao salvar a chave privada:', error);
         }

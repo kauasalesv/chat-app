@@ -16,7 +16,7 @@ const ChatUpBar = ({ typeChat, contactName, contactEmail }) => {
   // Função para lidar com a navegação
   const handleMenuItemPress = (menuType) => {
     if (menuType === 'group') {
-      navigation.navigate('EditGroup'); // Navega para EditGroup
+      //navigation.navigate('EditGroup'); // Navega para EditGroup
     } else {
       navigation.navigate('EditContact', {
         contactName: contactName,

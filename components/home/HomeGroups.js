@@ -70,6 +70,7 @@ const HomeGroups = ({ searchTerm }) => {
                                 source={require('../../assets/onlineImage.png')}
                                 style={styles.homeGroupsOnlineImage} 
                             />*/}
+                            {/*
                             <ImageBackground 
                                 source={require('../../assets/notificationImage.png')}
                                 style={styles.homeGroupsNotificationContainer} 
@@ -77,6 +78,7 @@ const HomeGroups = ({ searchTerm }) => {
                             >
                                 <Text style={styles.homeGroupsNotificationText}>111</Text>
                             </ImageBackground>
+                            */}
                         </View>
                     </TouchableOpacity>
                 ))

@@ -22,18 +22,20 @@ import AddEditContacts from './components/chat/delete-edit/AddEditContacts';
 import ConfirmationMessage from './components/layout/ConfirmationMessage';
 
 const Stack = createStackNavigator();
-const socket = io('http://192.168.1.7:3000'); // URL do seu servidor
+const socket = io('http://192.168.4.206:3000'); // URL do seu servidor
 
 export default function App() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        const userEmail = user.email;
+        var userEmail = user.email;
         socket.connect(); // Conectar ao socket quando o usuário estiver autenticado
         socket.emit('register', userEmail);
-        console.log(`Usuário conectado: ${userEmail}`);
+        //console.log("\x1b[35m", `Usuário conectado:`);
+        //console.log(userEmail);
+        
       } else {
-        console.log('Usuário desconectado');
+        //console.log("\x1b[35m", 'Usuário desconectado:');
         socket.disconnect(); // Desconectar se o usuário não estiver autenticado
       }
     });
@@ -41,7 +43,8 @@ export default function App() {
     const handleAppStateChange = (nextAppState) => {
       if (nextAppState === 'background') {
         socket.disconnect();
-        console.log('Socket desconectado ao entrar em segundo plano');
+        //console.log("\x1b[35m", 'Socket desconectado ao entrar em segundo plano');
+
       }
       if (nextAppState === 'active') {
         // Verifica se o usuário está autenticado antes de reconectar
@@ -50,7 +53,8 @@ export default function App() {
             const userEmail = user.email;
             socket.connect();
             socket.emit('register', userEmail);
-            console.log('Socket conectado ao voltar para o aplicativo');
+            //console.log("\x1b[35m", 'Socket conectado ao voltar para o aplicativo');
+            //console.log(socket.id);
           }
         });
       }

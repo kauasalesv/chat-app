@@ -70,51 +70,55 @@ const ChatMessages = ({ messages }) => {
   return (
     <View style={styles.chatMessagesContainer}>
       <ScrollView ref={scrollViewRef}>
-        {sortedMessages.map((message, index) => {
-          const isLastMessageFromSender =
-            (index === sortedMessages.length - 1) || 
-            (sortedMessages[index + 1].from !== message.from);
+        {sortedMessages.length === 0 ? (
+          <Text style={styles.noMessagesText}> Nenhuma mensagem </Text>
+        ) : (
+          sortedMessages.map((message, index) => {
+            const isLastMessageFromSender =
+              index === sortedMessages.length - 1 ||
+              sortedMessages[index + 1].from !== message.from;
 
-          const uniqueKey = `${message.id || index}-${message.time ? message.time.seconds || message.time : Date.now()}`;
-          const messageTime = getMessageTime(message.time);
+            const uniqueKey = `${message.id || index}-${message.time ? message.time.seconds || message.time : Date.now()}`;
+            const messageTime = getMessageTime(message.time);
 
-          // Verifica se o sender está na lista de contatos
-          const contact = contacts.find(contact => contact.email === message.sender);
+            const contact = contacts.find(contact => contact.email === message.sender);
 
-          // Formata a data para comparação
-          const messageDate = messageTime.toLocaleDateString();
-          const showDate = index === 0 || messageDate !== getMessageTime(sortedMessages[index - 1].time).toLocaleDateString();
+            const messageDate = messageTime.toLocaleDateString();
+            const showDate = index === 0 || messageDate !== getMessageTime(sortedMessages[index - 1].time).toLocaleDateString();
 
-          return (
-            <View key={uniqueKey}>
-              {showDate && (
-                <Text style={styles.chatMessagesDateText}>
-                  {messageDate}
-                </Text>
-              )}
-
-              <View 
-                style={[
-                  message.from === 'me' ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
-                  message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#565656' } : {}
-                ]}
-              >
-                {message.from === 'other' && message.sender ? (
-                  <Text style={styles.chatMessagesSenderEmail}>
-                    {contact ? contact.name : message.sender} {/* Renderiza o nome do contato ou o email do sender */}
+            return (
+              <View key={uniqueKey}>
+                {showDate && (
+                  <Text style={styles.chatMessagesDateText}>
+                    {messageDate}
                   </Text>
-                ) : null}
-                <Text style={styles.chatMessagesMessageText}>{message.text}</Text>
-                <Text style={styles.chatMessagesTimestamp}>
-                  {isLastMessageFromSender && messageTime && (
-                    <>{/* Apenas exibe a hora se for a última mensagem do remetente */}</>
-                  )}
-                  {messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+                )}
+
+                <View
+                  style={[
+                    message.from === 'me' ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
+                    message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#565656' } : {}
+                  ]}
+                >
+                  {message.from === 'other' && message.sender ? (
+                    <Text style={styles.chatMessagesSenderEmail}>
+                      {contact ? contact.name : message.sender}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.chatMessagesMessageText}>{message.text}</Text>
+                  <Text style={styles.chatMessagesTimestamp}>
+                    {isLastMessageFromSender && messageTime && (
+                      <>
+                        {/* Apenas exibe a hora se for a última mensagem do remetente */}
+                      </>
+                    )}
+                    {messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
       </ScrollView>
     </View>
   );

@@ -14,7 +14,7 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-const socket = io('http://192.168.1.7:3000');
+const socket = io('http://192.168.4.206:3000');
 const IDEA = require("idea-cipher");
 
 const Chat = () => {
@@ -32,14 +32,14 @@ const Chat = () => {
         socket.emit('register', userEmail);
     
         socket.on('receiveMessage', async (data) => {
-            console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}; chave: ${data.recipientKey}`);
+            //console.log(`Mensagem recebida: "${data.message}" de ${data.senderId}; chave: ${data.recipientKey}`);
 
             //message, senderKey, recipientKey, senderId: senderEmail
 
             const myPriviteKey = await getPrivateKey(user.uid);
             const chaveDescriptografada = await descriptografarRSA(data.recipientKey, myPriviteKey);
 
-            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada))
+            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada), myPriviteKey, data.recipientKey)
 
             const receivedMessage = { 
                 id: messages.length + 1,
@@ -94,8 +94,32 @@ const Chat = () => {
         const criptografia = await findExistingKey(messageText, userEmail, contactEmail, myPriviteKey);
 
         // Envia a mensagem pelo Socket.io
-        socket.emit('sendMessage', { message: criptografia[0], senderKey: criptografia[1], recipientKey: criptografia[2], recipientEmail: contactEmail, senderEmail: userEmail });
-        setMessageText(''); // Limpa o campo de 
+        socket.emit('sendMessage', { message: criptografia[1], senderKey: criptografia[2], recipientKey: criptografia[3], senderEmail: userEmail, recipientEmail: contactEmail });
+        
+        console.log('\n\n');
+        console.log("\x1b[31m", "Email remetente: ");
+        console.log(userEmail);
+        console.log("\x1b[31m", "Chave RSA pública remetente: ");
+        console.log(criptografia[4]);
+        console.log("\x1b[31m", "Chave RSA privada remetente: ");
+        console.log(myPriviteKey);
+        console.log('\n');
+
+        console.log("\x1b[31m", "Email destinatário: ");
+        console.log(contactEmail);
+        console.log("\x1b[31m", "Chave RSA pública destinatário: ")
+        console.log(criptografia[5]);
+        console.log('\n');
+
+        console.log("\x1b[31m", "Chave IDEA conversa: ");
+        console.log(criptografia[0]);
+        console.log('\n');
+
+        console.log("\x1b[31m", "Mensagem: ");
+        console.log(messageText);
+        console.log('\n\n');
+
+        setMessageText('');
     };
 
     const loadMyMessages = async () => {
@@ -112,12 +136,13 @@ const Chat = () => {
 
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada)),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.senderKey),
                 time: msg.time,
                 from: 'me',
                 status: msg.status // Inclui o status
             }));
             setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
+
         } else {
             //console.log("Nenhuma mensagem encontrada para o usuário.");
         }
@@ -137,7 +162,7 @@ const Chat = () => {
             // Atualiza o status das mensagens carregadas para 'read'
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada)),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.recipientKey),
                 time: msg.time,
                 from: 'other',
                 status: 'read' // Atualiza o status para 'read'
@@ -185,15 +210,28 @@ const Chat = () => {
         const idea = new IDEA(chave);
         const mensagemBuffer = Buffer.from(mensagem, 'utf-8');
         const criptografada = idea.encrypt(mensagemBuffer);
-        console.log("Mensagem criptografada (hex):", criptografada.toString('hex'));
+        //console.log("Mensagem criptografada (hex):", criptografada.toString('hex'));
         return criptografada;
     }
 
     // Função para descriptografar a mensagem com IDEA
-    function descriptografarIDEA(criptografada, chave) {
+    function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada) {
         const idea = new IDEA(chave);
         const descriptografada = idea.decrypt(criptografada);
-        console.log("Mensagem descriptografada:", descriptografada.toString('utf-8'));
+
+        console.log('\n\n');
+        console.log("\x1b[34m", "Mensagem criptografada:");
+        console.log(toBase64(criptografada));
+        console.log("\x1b[34m", "Chave IDEA criptografada:");
+        console.log(chaveCriptografada);
+        console.log("\x1b[34m", "Chave privada RSA:");
+        console.log(chavePrivada);
+        console.log("\x1b[34m", "Chave IDEA descriptografada:");
+        console.log(toBase64(chave));
+        console.log("\x1b[34m", "Mensagem descriptografada:");
+        console.log(descriptografada.toString('utf-8'));
+        console.log('\n\n');
+
         return descriptografada.toString('utf-8');
     }
 
@@ -247,7 +285,7 @@ const Chat = () => {
 
             // Verificar se o documento existe e retornar a chave
             if (chatDoc1.exists()) {
-                console.log("EXISTE 1");
+                //console.log("EXISTE 1");
                 const chatData = chatDoc1.data();
 
                 const chaveDescriptografada = await descriptografarRSA(chatData.recipientKey, myPriviteKey);
@@ -259,7 +297,7 @@ const Chat = () => {
                 const senderKey = await criptografarRSA(toBase64(chave), senderPublicKey);
                 const recipientKey = await criptografarRSA(toBase64(chave), recipientPublicKey);
 
-                const array = [toBase64(criptografada), senderKey, recipientKey];
+                const array = [toBase64(chave), toBase64(criptografada), senderKey, recipientKey, senderPublicKey, recipientPublicKey];
 
                 return array
 
@@ -276,7 +314,7 @@ const Chat = () => {
                 const senderKey = await criptografarRSA(toBase64(chave), senderPublicKey);
                 const recipientKey = await criptografarRSA(toBase64(chave), recipientPublicKey);
 
-                const array = [toBase64(criptografada), senderKey, recipientKey];
+                const array = [toBase64(chave), toBase64(criptografada), senderKey, recipientKey, senderPublicKey, recipientPublicKey];
 
                 return array 
             }
@@ -289,7 +327,7 @@ const Chat = () => {
                 const senderKey = await criptografarRSA(toBase64(chave), senderPublicKey);
                 const recipientKey = await criptografarRSA(toBase64(chave), recipientPublicKey);
 
-                const array = [toBase64(criptografada), senderKey, recipientKey];
+                const array = [toBase64(chave), toBase64(criptografada), senderKey, recipientKey, senderPublicKey, recipientPublicKey];
 
                 return array
             }

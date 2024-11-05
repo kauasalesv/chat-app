@@ -47,5 +47,11 @@ export default StyleSheet.create({
   chatMessagesSenderEmail: {
     color: "#373737",
     fontWeight: '900'
+  },
+
+  noMessagesText: {
+    color: 'white',
+    alignSelf: 'center',
+    marginTop: 10,
   }
 });

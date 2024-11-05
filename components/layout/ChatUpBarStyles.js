@@ -34,7 +34,6 @@ export default StyleSheet.create({
     width: 45,
     height: 45,
     alignSelf: 'center',
-    marginRight: 'auto',
     marginLeft: 20,
   },
 
@@ -42,7 +41,7 @@ export default StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     marginRight: 'auto',
-    marginLeft: -140
+    marginLeft: 20,
   },
   
   chatUpBarMenuImage: {

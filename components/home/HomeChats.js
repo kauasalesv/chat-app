@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, ScrollView, ImageBackground, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, ImageBackground, TouchableOpacity, ActivityIndicator, onSnapshot } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native'; 
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase'; 
@@ -75,7 +75,7 @@ const HomeChats = ({ searchTerm }) => {
                 await updateDoc(userRef, {
                     contacts: arrayUnion(...newContacts)
                 });
-                console.log('Novos contatos adicionados:', newContacts);
+                //console.log('Novos contatos adicionados:', newContacts);
             }
         } catch (error) {
             console.error('Erro ao atualizar contatos a partir dos chats:', error);
@@ -100,14 +100,14 @@ const HomeChats = ({ searchTerm }) => {
         return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     };
 
-    const filteredContacts = contacts.filter(contact => {
-        // Verifica se contact.name e searchTerm são definidos antes de aplicar toLowerCase
-        if (contact.name && searchTerm) {
-            return removeAccents(contact.name.toLowerCase()).includes(removeAccents(searchTerm.toLowerCase()));
-        }
-        return true; // Retorna true para manter o contato na lista se searchTerm não for definido
-    });
-    
+    const filteredContacts = contacts
+        .filter(contact => {
+            if (contact.name && searchTerm) {
+                return removeAccents(contact.name.toLowerCase()).includes(removeAccents(searchTerm.toLowerCase()));
+            }
+            return true;
+        })
+        .sort((a, b) => b.pendingCount - a.pendingCount);
 
     const handleContactPress = (contact) => {
         navigation.navigate('Chat', { typeChat: 'chat', contactName: contact.name, contactEmail: contact.email });

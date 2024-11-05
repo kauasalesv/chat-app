@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Image, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native'; 
-import { doc, setDoc, arrayUnion, collection } from 'firebase/firestore'; 
+import { doc, setDoc, arrayUnion, collection, query, where, getDoc, getDocs } from 'firebase/firestore'; 
 import { auth, db } from '../../../config/firebase'; 
 import { Buffer } from 'buffer';
 import { TextDecoder } from 'text-encoding';
+import Rsa from 'react-native-rsa-native';
+import * as Keychain from 'react-native-keychain';
 import styles from "./CreateGroupStyles";
 
 const IDEA = require("idea-cipher");
@@ -30,7 +32,6 @@ const CreateGroup = () => {
         );
     };
 
-    // Função para criar o grupo
     const createGroup = async () => {
         if (groupParticipants.length === 0) {
             Alert.alert("Atenção", "Adicione pelo menos um participante ao grupo.");
@@ -42,47 +43,97 @@ const CreateGroup = () => {
         }
 
         try {
-            const groupId = doc(collection(db, 'groups')).id; // Gera um ID único para o grupo
+            const groupId = doc(collection(db, 'groups')).id; 
             const key = toBase64(gerarChaveIDEA());
+
+            const myPublicKey = await getMyPublicKey();
+            const myKey =  await criptografarRSA(key, myPublicKey);
+
+            const members = [
+                { email: auth.currentUser.email, key: myKey } 
+            ];
+
+            // Para cada participante, buscar a chave pública e criptografar a chave IDEA
+            for (let contact of groupParticipants) {
+                const publicKey = await getContactPublicKey(contact.email);
+                if (publicKey) {
+                    const chaveCriptografada = await criptografarRSA(key, publicKey);
+                    members.push({ email: contact.email, key: chaveCriptografada });
+                } else {
+                    console.log(`Chave pública não encontrada para ${contact.email}`);
+                }
+            }
+
             const groupData = {
                 name: groupName,
                 createdBy: auth.currentUser.email,
-                key: key,
-                members: [
-                    { email: auth.currentUser.email }, // Adiciona o e-mail do criador
-                    ...groupParticipants.map(contact => ({
-                        email: contact.email,
-                    }))
-                ],
-                messages: [] // Inicializa o array de mensagens como vazio
+                members,
+                messages: []
             };
 
-            // Adiciona o grupo ao Firestore
             await setDoc(doc(db, 'groups', groupId), groupData);
 
             Alert.alert("Sucesso", "Grupo criado com sucesso!");
-            navigation.goBack(); // Volta para a tela anterior após criar o grupo
+            console.log("Chave IDEA do grupo: ");
+            console.log(key);
+            navigation.goBack();
         } catch (error) {
             console.error("Atenção ao criar o grupo: ", error);
             Alert.alert("Atenção", "Ocorreu um erro ao criar o grupo.");
         }
     };
 
-    // Função para gerar uma chave IDEA (128 bits, 16 bytes)
     function gerarChaveIDEA() {
-        // Em produção, use um gerador de chaves seguro
         return Buffer.from(Array.from({ length: 16 }, () => Math.floor(Math.random() * 256)));
     }
 
-    // Função para converter Uint8Array ou Buffer para base64
     function toBase64(data) {
         return Buffer.from(data).toString('base64');
     }
 
-    // Função para converter base64 de volta para Uint8Array
-    function fromBase64(base64String) {
-        return new Uint8Array(Buffer.from(base64String, 'base64'));
-    }
+    const getContactPublicKey = async (contactEmail) => {
+        const usersRef = collection(db, 'users'); 
+        const q = query(usersRef, where('email', '==', contactEmail)); 
+        const querySnapshot = await getDocs(q); 
+        let recipientPublicKey = null;
+
+        if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            recipientPublicKey = userDoc.data().publicKey; 
+            return recipientPublicKey;
+        } else {
+            console.log("Nenhum usuário encontrado com esse e-mail.");
+            return null; 
+        }
+    };
+
+    const getMyPublicKey = async () => {
+        try {
+            // Obtenha o UID do usuário autenticado
+            const userId = auth.currentUser.uid; 
+            const userDocRef = doc(db, 'users', userId); // Referência direta ao documento do usuário
+            const userDoc = await getDoc(userDocRef); // Obtém o documento
+    
+            if (userDoc.exists()) {
+                return userDoc.data().publicKey; // Acesse a chave pública
+            } else {
+                console.log("Documento do usuário não encontrado.");
+                return null; // Retorna null se o documento não existir
+            }
+        } catch (error) {
+            console.error("Erro ao buscar minha chave pública:", error);
+            return null; // Retorna null em caso de erro
+        }
+    };
+
+    const criptografarRSA = async (message, publicKey) => {
+        try {
+            const encrypted = await Rsa.encrypt(message, publicKey);
+            return encrypted;
+        } catch (error) {
+            console.error('Erro ao criptografar a mensagem:', error);
+        }
+    };
 
     return (
         <View style={styles.createGroupContainer}>

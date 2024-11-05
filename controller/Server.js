@@ -19,7 +19,8 @@ io.on('connection', (socket) => {
     socket.on('register', (email) => {
         userSockets[email] = socket.id; // Mapeia o email ao socketId
         //console.log('Usuário conectado:', socket.id);
-        console.log(`Usuário registrado: ${email} com socket ${socket.id}`);
+        console.log("\x1b[35m", 'Usuário registrado: ');
+        console.log("\x1b[0m", `${email} com socket ${socket.id}`);
     });
 
     // Escuta por mensagens enviadas por um usuário
@@ -31,12 +32,12 @@ io.on('connection', (socket) => {
         // Envia a mensagem ao usuário específico pelo email
         const recipientSocketId = userSockets[recipientEmail];
         if (recipientSocketId) {
-            console.log(recipientSocketId);
+            //console.log(recipientSocketId);
             await saveMessageToFirestore(message, senderKey, recipientKey, senderEmail, recipientEmail); 
 
             io.to(recipientSocketId).emit('receiveMessage', { message, senderKey, recipientKey, senderId: senderEmail });
 
-            console.log(`Mensagem enviada para ${recipientEmail}: "${message}" de ${senderEmail}`);
+            //console.log(`Mensagem enviada para ${recipientEmail}: "${message}" de ${senderEmail}`);
         } else {
             console.log(`${recipientEmail} está offline, persistindo a mensagem no Firestore.`);
             await saveMessageToFirestore(message, senderKey, recipientKey, senderEmail, recipientEmail);
@@ -53,19 +54,19 @@ io.on('connection', (socket) => {
 
         // Envia a mensagem para todos os participantes conectados do grupo
         const groupMembers = await getGroupMembers(groupId, senderEmail);
-        console.log(userSockets);
-        console.log(groupMembers);
+        //console.log(userSockets);
+        //console.log(groupMembers);
         
         groupMembers.forEach((memberEmail) => {
             const memberSocketId = userSockets[memberEmail];
-            console.log(`ID do socket para ${memberEmail}:`, memberSocketId);
+            //console.log(`ID do socket para ${memberEmail}:`, memberSocketId);
             
             if (memberSocketId) {
                 if (memberEmail !== senderEmail) {
                     io.to(memberSocketId).emit('receiveGroupMessage', { message, key, senderId: senderEmail, groupId });
-                    console.log(`Mensagem enviada para ${memberEmail} no grupo ${groupId}`);
+                    //console.log(`Mensagem enviada para ${memberEmail} no grupo ${groupId}`);
                 } else {
-                    console.log(`Mensagem não enviada para ${memberEmail} pois é o remetente`);
+                    //console.log(`Mensagem não enviada para ${memberEmail} pois é o remetente`);
                 }
             } else {
                 console.log(`Nenhum socket encontrado para ${memberEmail}`); // Log para sockets não encontrados
@@ -80,7 +81,10 @@ io.on('connection', (socket) => {
         // Remover o usuário do mapeamento quando desconectar
         for (const email in userSockets) {
             if (userSockets[email] === socket.id) {
-                console.log(`Usuário desconectado: ${email}`);
+
+                console.log("\x1b[35m", `Usuário desconectado: `);
+                console.log("\x1b[0m", `${email} com socket ${socket.id}`);
+
                 delete userSockets[email];
                 break;
             }
@@ -114,7 +118,7 @@ io.on('connection', (socket) => {
                 });
             } else {
                 // O documento não existe, cria um novo
-                console.log(messageData);
+                //console.log(messageData);
                 await setDoc(chatRef, {
                     senderKey: senderKey,
                     recipientKey: recipientKey,

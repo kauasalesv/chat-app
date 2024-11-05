@@ -31,7 +31,7 @@ const MyUser = () => {
         if (user) {
             Alert.alert(
                 "Atenção",
-                "Você realmente deseja excluir sua conta? Esta ação não pode ser desfeita.",
+                "Você realmente deseja excluir sua conta? Esta ação não pode ser desfeita e você perderá seus contatos, grupos e conversas (seus contatos também perderão).",
                 [
                     {
                         text: "Cancelar",

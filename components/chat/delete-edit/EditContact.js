@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Image, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { doc, updateDoc, arrayRemove, arrayUnion, getDoc } from 'firebase/firestore'; 
+import { doc, updateDoc, arrayRemove, arrayUnion, getDoc, deleteDoc  } from 'firebase/firestore'; 
 import { auth, db } from '../../../config/firebase'; 
 import styles from "./EditContactStyles";
 
@@ -53,7 +53,7 @@ const EditContact = ({ route }) => {
     const handleDeleteContact = () => {
         Alert.alert(
             "Atenção",
-            "Você realmente deseja excluir esse contato? Esta ação não pode ser desfeita.",
+            "Você realmente deseja excluir esse contato? Esta ação não pode ser desfeita e você perderá a sua conversa (seu contato também perderá).",
             [
                 {
                     text: "Cancelar",
@@ -66,6 +66,27 @@ const EditContact = ({ route }) => {
                         try {
                             const userId = auth.currentUser.uid; // Obtém o ID do usuário autenticado
                             const userRef = doc(db, 'users', userId); // Referência ao documento do usuário
+
+                            const userEmail = auth.currentUser.email;
+                            const chatId1 = `${userEmail}:${contactEmail}`;
+                            const chatId2 = `${contactEmail}:${userEmail}`;
+
+                            try {
+                                const chatRef1 = doc(db, 'chats', chatId1);
+                                await deleteDoc(chatRef1);
+                                console.log(`Documento ${chatId1} excluído com sucesso.`);
+                            } catch (error) {
+                                console.error("Erro ao excluir chatId1:", error);
+                            }
+                            
+                            try {
+                                const chatRef2 = doc(db, 'chats', chatId2);
+                                await deleteDoc(chatRef2);
+                                console.log(`Documento ${chatId2} excluído com sucesso.`);
+                            } catch (error) {
+                                console.error("Erro ao excluir chatId2:", error);
+                            }
+                            
 
                             // Primeiro, obter o documento do usuário para verificar os contatos
                             const userSnap = await getDoc(userRef);
