@@ -14,16 +14,19 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-const socket = io('http://192.168.4.206:3000');
+// const socket = io('http://192.168.83.206:3000');
+const socket = io('http://192.168.1.7:3000'); // URL do seu servidor
+
 const IDEA = require("idea-cipher");
 
 const ChatGroup = () => {
     const [messages, setMessages] = useState([]);
     const [messageText, setMessageText] = useState('');
     const [isChatVisible, setIsChatVisible] = useState(true); // Adiciona estado para controle de visibilidade
+    const [groupMembers, setGroupMembers] = useState([])
     const route = useRoute();
     const navigation = useNavigation();
-    const { typeChat, groupId, groupName } = route.params;
+    const { typeChat, groupId, groupName, groupCreator } = route.params;
 
     useEffect(() => {
         const userEmail = auth.currentUser.email;
@@ -36,8 +39,7 @@ const ChatGroup = () => {
             const chaveCripitografada = await getMemberKeyFromGroup(groupId, userEmail);
             const chaveDescriptografada = await descriptografarRSA(chaveCripitografada, myPriviteKey);
 
-
-            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada);
+            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada, userEmail);
 
             const receivedMessage = { 
                 id: messages.length + 1,
@@ -82,6 +84,7 @@ const ChatGroup = () => {
         const authEmail = auth.currentUser.email; // Obtém o email do usuário autenticado
 
         const myPriviteKey = await getPrivateKey(auth.currentUser.uid);
+        const myPublicKey = await getMyPublicKey();
         const chaveCripitografada = await getMemberKeyFromGroup(groupId, authEmail);
         const chaveDescriptografada = await descriptografarRSA(chaveCripitografada, myPriviteKey);
 
@@ -98,6 +101,22 @@ const ChatGroup = () => {
 
         // Envia a mensagem pelo Socket.io
         socket.emit('sendGroupMessage', { message: toBase64(message), key: chaveCripitografada, senderEmail: authEmail, groupId });
+
+        console.log('\n\n');
+        console.log("\x1b[31m", "Email remetente: ");
+        console.log(authEmail);
+        console.log("\x1b[31m", "Chave RSA pública remetente: ");
+        console.log(myPublicKey);
+        console.log("\x1b[31m", "Chave RSA privada remetente: ");
+        console.log(myPriviteKey);
+        console.log('\n');
+        console.log("\x1b[31m", "Chave IDEA conversa: ");
+        console.log(chaveDescriptografada);
+        console.log('\n');
+        console.log("\x1b[31m", "Mensagem: ");
+        console.log(messageText);
+        console.log('\n\n');
+
         setMessageText(''); 
     };
 
@@ -117,7 +136,7 @@ const ChatGroup = () => {
                 .filter((msg) => msg.sender === authEmail) // Filtra as mensagens onde o remetente é o usuário autenticado
                 .map((msg, index) => ({
                     id: index + 1,
-                    text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada),
+                    text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada, msg.sender),
                     time: msg.time,
                     from: 'me',
                     sender: authEmail,
@@ -146,7 +165,7 @@ const ChatGroup = () => {
                 .filter((msg) => msg.sender !== authEmail) 
                 .map((msg, index) => ({
                     id: index + 1,
-                    text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada),
+                    text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada, msg.sender),
                     time: msg.time,
                     from: 'other',
                     sender: msg.sender,
@@ -191,19 +210,30 @@ const ChatGroup = () => {
         const idea = new IDEA(chave);
         const mensagemBuffer = Buffer.from(mensagem, 'utf-8');
         const criptografada = idea.encrypt(mensagemBuffer);
-        console.log("Mensagem criptografada (hex):", criptografada.toString('hex'));
+        //console.log("Mensagem criptografada (hex):", criptografada.toString('hex'));
         return criptografada;
     }
 
     // Função para descriptografar a mensagem com IDEA
-    function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada) {
+    function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada, senderEmail) {
         const idea = new IDEA(chave);
         const descriptografada = idea.decrypt(criptografada);
-        console.log("\nMensagem criptografada:", toBase64(criptografada));
-        console.log("Chave IDEA criptografada:", chaveCriptografada);
-        console.log("Chave privada RSA:", chavePrivada)
-        console.log("Chave IDEA descriptografada:", toBase64(chave));
-        console.log("Mensagem descriptografada:", descriptografada.toString('utf-8'));
+
+        console.log('\n\n');
+        console.log("\x1b[34m", "Email remetente:");
+        console.log(senderEmail);
+        console.log("\x1b[34m", "Mensagem criptografada:");
+        console.log(toBase64(criptografada));
+        console.log("\x1b[34m", "Chave IDEA criptografada:");
+        console.log(chaveCriptografada);
+        console.log("\x1b[34m", "Chave privada RSA:");
+        console.log(chavePrivada);
+        console.log("\x1b[34m", "Chave IDEA descriptografada:");
+        console.log(toBase64(chave));
+        console.log("\x1b[34m", "Mensagem descriptografada:");
+        console.log(descriptografada.toString('utf-8'));
+        console.log('\n\n');
+
         return descriptografada.toString('utf-8');
     }
 
@@ -262,7 +292,8 @@ const ChatGroup = () => {
     
                 // Encontra o membro específico pelo email
                 const member = groupData.members.find((m) => m.email === memberEmail);
-    
+                setGroupMembers(groupData.members);
+
                 if (member) {
                     // Retorna a chave IDEA criptografada do membro
                     return member.key;
@@ -277,6 +308,25 @@ const ChatGroup = () => {
         } catch (error) {
             console.error("Erro ao buscar a chave do membro:", error);
             return null;
+        }
+    };
+
+    const getMyPublicKey = async () => {
+        try {
+            // Obtenha o UID do usuário autenticado
+            const userId = auth.currentUser.uid; 
+            const userDocRef = doc(db, 'users', userId); // Referência direta ao documento do usuário
+            const userDoc = await getDoc(userDocRef); // Obtém o documento
+    
+            if (userDoc.exists()) {
+                return userDoc.data().publicKey; // Acesse a chave pública
+            } else {
+                console.log("Documento do usuário não encontrado.");
+                return null; // Retorna null se o documento não existir
+            }
+        } catch (error) {
+            console.error("Erro ao buscar minha chave pública:", error);
+            return null; // Retorna null em caso de erro
         }
     };
 
@@ -295,7 +345,7 @@ const ChatGroup = () => {
 
     return (
         <View style={styles.chatContainer}>
-            <ChatUpBar typeChat={typeChat} contactName={groupName} contactEmail={groupId} />
+            <ChatUpBar typeChat={typeChat} contactName={groupName} contactEmail={groupId} groupCreator={groupCreator}/>
             {isChatVisible && ( // Renderiza ChatMessages apenas se isChatVisible for true
                 <ChatMessages 
                     messages={messages} 

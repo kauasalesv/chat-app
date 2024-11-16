@@ -53,12 +53,17 @@ const CreateGroup = () => {
                 { email: auth.currentUser.email, key: myKey } 
             ];
 
+            const membersToConsole = [
+                { email: auth.currentUser.email, ideaCriptografada: myKey, publicKey: myPublicKey } 
+            ];
+
             // Para cada participante, buscar a chave pública e criptografar a chave IDEA
             for (let contact of groupParticipants) {
                 const publicKey = await getContactPublicKey(contact.email);
                 if (publicKey) {
                     const chaveCriptografada = await criptografarRSA(key, publicKey);
                     members.push({ email: contact.email, key: chaveCriptografada });
+                    membersToConsole.push({email: contact.email, ideaCriptografada: chaveCriptografada, publicKey: publicKey})
                 } else {
                     console.log(`Chave pública não encontrada para ${contact.email}`);
                 }
@@ -74,8 +79,22 @@ const CreateGroup = () => {
             await setDoc(doc(db, 'groups', groupId), groupData);
 
             Alert.alert("Sucesso", "Grupo criado com sucesso!");
-            console.log("Chave IDEA do grupo: ");
+            
+            console.log("\x1b[33m", "Grupo criado com sucesso!");
+            console.log("\x1b[33m", "Chave IDEA do grupo: ");
             console.log(key);
+
+            console.log("\x1b[33m", "Membros");
+            for (let member of membersToConsole) {
+                console.log("\x1b[33m", "Email:");
+                console.log(member.email);
+                console.log("\x1b[33m", "Chave RSA pública:");
+                console.log(member.publicKey);
+                console.log("\x1b[33m", "Chave IDEA criptografada:");
+                console.log(member.ideaCriptografada);
+                console.log("\n");
+            }
+
             navigation.goBack();
         } catch (error) {
             console.error("Atenção ao criar o grupo: ", error);

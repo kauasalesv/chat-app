@@ -14,7 +14,9 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-const socket = io('http://192.168.4.206:3000');
+// const socket = io('http://192.168.83.206:3000');
+const socket = io('http://192.168.1.7:3000'); // URL do seu servidor
+
 const IDEA = require("idea-cipher");
 
 const Chat = () => {
@@ -39,7 +41,7 @@ const Chat = () => {
             const myPriviteKey = await getPrivateKey(user.uid);
             const chaveDescriptografada = await descriptografarRSA(data.recipientKey, myPriviteKey);
 
-            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada), myPriviteKey, data.recipientKey)
+            const message = descriptografarIDEA(fromBase64(data.message), fromBase64(chaveDescriptografada), myPriviteKey, data.recipientKey, userEmail, contactEmail)
 
             const receivedMessage = { 
                 id: messages.length + 1,
@@ -136,7 +138,7 @@ const Chat = () => {
 
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.senderKey),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.senderKey, userEmail, contactEmail),
                 time: msg.time,
                 from: 'me',
                 status: msg.status // Inclui o status
@@ -162,7 +164,7 @@ const Chat = () => {
             // Atualiza o status das mensagens carregadas para 'read'
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.recipientKey),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.recipientKey, contactEmail, auth.currentUser.email),
                 time: msg.time,
                 from: 'other',
                 status: 'read' // Atualiza o status para 'read'
@@ -215,11 +217,15 @@ const Chat = () => {
     }
 
     // Função para descriptografar a mensagem com IDEA
-    function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada) {
+    function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada, senderEmail, recipientEmail) {
         const idea = new IDEA(chave);
         const descriptografada = idea.decrypt(criptografada);
 
         console.log('\n\n');
+        console.log("\x1b[34m", "Email do Remetente:");
+        console.log(senderEmail);
+        console.log("\x1b[34m", "Email do Destinatário:");
+        console.log(recipientEmail);
         console.log("\x1b[34m", "Mensagem criptografada:");
         console.log(toBase64(criptografada));
         console.log("\x1b[34m", "Chave IDEA criptografada:");
