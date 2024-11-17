@@ -29,8 +29,6 @@ const ChatUpBar = ({ typeChat, contactName, contactEmail, groupCreator }) => {
         }
     } catch (error) {
         console.error("Erro ao buscar contatos:", error);
-    } finally {
-        setLoading(false); // Para de exibir o indicador de carregamento
     }
   };
 

@@ -7,7 +7,7 @@ import styles from "./AddEditContactsStyles";
 
 const AddEditContacts = ({ route }) => {
     const navigation = useNavigation();
-    const { contacts, members } = route.params;
+    const { groupName, groupId, groupCreator, contacts, members } = route.params;
     const [notInGroupContacts, setNotInGroupContacts] = useState([]);
 
     // Estados para armazenar os contatos, o termo de pesquisa, o carregamento e os contatos selecionados
@@ -33,16 +33,17 @@ const AddEditContacts = ({ route }) => {
     );
 
     const toggleContactSelection = (contactId) => {
-        setSelectedContacts(prevSelectedContacts => {
+        setSelectedContacts((prevSelectedContacts) => {
             if (prevSelectedContacts.includes(contactId)) {
                 // Se o contato já está selecionado, removê-lo
-                return prevSelectedContacts.filter(id => id !== contactId);
+                return prevSelectedContacts.filter((id) => id !== contactId);
             } else {
                 // Caso contrário, adicionar o contato aos selecionados
                 return [...prevSelectedContacts, contactId];
             }
         });
     };
+    
 
     return (
         <View style={styles.addEditContactsContainer}>
@@ -78,31 +79,35 @@ const AddEditContacts = ({ route }) => {
                 </TouchableOpacity>
 
                 <ScrollView>
-                    {filteredContacts.length > 0 ? (
-                        filteredContacts.map(contact => (
-                            <TouchableOpacity
-                                key={contact.id} // Certifique-se de que contact.id é realmente único
-                                onPress={() => toggleContactSelection(contact.id)} // Alterna a seleção
-                                style={[
-                                    styles.addEditContactsContactsContact,
-                                    selectedContacts.includes(contact.id) && { backgroundColor: 'rgba(89, 107, 178, 0.41)' } // Cor de fundo se selecionado
-                                ]}
-                            >
-                                <Image 
-                                    source={require('../../../assets/userImage.png')}
-                                    style={styles.addEditContactsContactsUserImage} 
-                                />
-                                <Text style={styles.addEditContactsContactsName}>{contact.name}</Text>
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        <Text style={styles.addEditContactsNoResultsText}>Nenhum contato encontrado</Text>
-                    )}
+                {filteredContacts.length > 0 ? (
+                    filteredContacts.map((contact) => (
+                        <TouchableOpacity
+                            key={contact.id || contact.email} // Use o campo mais confiável e único
+                            onPress={() => toggleContactSelection(contact.id || contact.email)} // Altere conforme necessário
+                            style={[
+                                styles.addEditContactsContactsContact,
+                                selectedContacts.includes(contact.id || contact.email) && { backgroundColor: 'rgba(89, 107, 178, 0.41)' } // Cor se selecionado
+                            ]}
+                        >
+                            <Image 
+                                source={require('../../../assets/userImage.png')}
+                                style={styles.addEditContactsContactsUserImage} 
+                            />
+                            <Text style={styles.addEditContactsContactsName}>{contact.name}</Text>
+                        </TouchableOpacity>
+                    ))
+                ) : (
+                    <Text style={styles.addEditContactsNoResultsText}>Nenhum contato encontrado</Text>
+                )}
+
                 </ScrollView>
             </View>
 
             <View style={styles.addEditContactsButtonContainer}>
-                <TouchableOpacity style={styles.addEditContactsSaveButton}>
+                <TouchableOpacity 
+                    style={styles.addEditContactsSaveButton}
+                    onPress={() => navigation.navigate('EditGroup', { groupName, groupId, groupCreator, contacts, members, selectedContacts })} 
+                >
                     <Text style={styles.addEditContactsButtonTittle}>Adicionar</Text>
                 </TouchableOpacity>
             </View>
