@@ -14,8 +14,8 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-// const socket = io('http://192.168.83.206:3000');
-const socket = io('http://192.168.1.7:3000'); // URL do seu servidor
+// const socket = io('http://192.168.112.206:3000');
+const socket = io('http://192.168.1.7:3000'); 
 
 const IDEA = require("idea-cipher");
 

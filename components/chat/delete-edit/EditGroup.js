@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Image, Text, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native'; 
 import { auth, db } from '../../../config/firebase'; 
 import { doc, updateDoc, arrayRemove, getDoc, collection, query, where, getDocs, arrayUnion } from 'firebase/firestore';
@@ -14,25 +14,40 @@ const IDEA = require("idea-cipher");
 const EditGroup = ({ route }) => {
     const { groupName, groupId, groupCreator, contacts, members, selectedContacts } = route.params;
     const [groupMembers, setGroupMembers] = useState(members); // Estado local para membros
+    const [newMembers, setNewMembers] = useState(selectedContacts);
+    const [newGroupName, setNewGroupName] = useState(groupName || '');
     const navigation = useNavigation(); 
     const user = auth.currentUser;
 
-    if(selectedContacts) {
-        console.log(selectedContacts);
-    }
+    // Use useEffect para atualizar o estado caso selectedContacts mude
+    useEffect(() => {
+        setNewMembers(selectedContacts);
+    }, [selectedContacts]);
 
-    const addUpdateMembers = async (key) => {
+    // Função para remover um participante
+    const removeNewParticipant = (email) => {
+        setNewMembers(prevParticipants => 
+            prevParticipants.filter(contact => contact.email !== email)
+        );
+    };
+
+    const addUpdateMembers = async (key, members) => {
         // Para cada participante, buscar a chave pública e criptografar a chave IDEA
-        for (let contact of selectedContacts) {
-            const publicKey = await getContactPublicKey(contact);
+        const newMembers =[];
+        
+        for (let contact of members) {
+            const publicKey = await getContactPublicKey(contact.email);
             if (publicKey) {
+
                 const chaveCriptografada = await criptografarRSA(key, publicKey);
-                groupMembers.push({ email: contact, key: chaveCriptografada });
+                newMembers.push({ email: contact.email, key: chaveCriptografada });
                 //membersToConsole.push({email: contact, ideaCriptografada: chaveCriptografada, publicKey: publicKey})
             } else {
                 console.log(`Chave pública não encontrada para ${contact.email}`);
             }
         }
+
+        return newMembers;
     }
 
     const handleAddParticipants = () => {
@@ -122,6 +137,170 @@ const EditGroup = ({ route }) => {
                         } catch (error) {
                             console.error("Erro ao remover o membro:", error);
                             Alert.alert("Erro", "Ocorreu um erro ao remover o participante.");
+                        }
+                    },
+                    style: "destructive", 
+                },
+            ]
+        );
+    };
+
+    const saveChanges = async () => {
+        try{
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+
+            if (groupSnap.exists()) {
+                const groupData = groupSnap.data();
+
+                var members = groupData.members || [];
+
+                // TROCA CHAVE IDEA
+                const messages = groupData.messages || [];
+                const ideaMember = members.find(member => member.email === user.email);
+                const oldEncryptedIdea = ideaMember.key;
+                const publicKey = await getMyPublicKey();
+                const privateKey = await getPrivateKey();
+                const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
+                const newIdea = gerarChaveIDEA();
+
+                const newKeyMembers = [];
+
+                if (messages) {
+                    messages.forEach(message => {
+                        if (message.content) {
+                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
+                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                            message.content = toBase64(encryptedMessage);
+                        }
+                    });
+
+                    await Promise.all(
+                        members.map(async (member) => {
+                            const publicKey = await getContactPublicKey(member.email);
+                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                            member.key = encryptedIdea;
+                        })
+                    );
+                    
+                    if (selectedContacts) {
+                        const newMembers = await addUpdateMembers(toBase64(newIdea), selectedContacts);
+
+                        members.push(...newMembers);
+
+                        await updateDoc(groupRef, {
+                            messages: messages,
+                            members: members
+                        });
+                    }
+
+                    await updateDoc(groupRef, {
+                        name: newGroupName
+                    });
+                }
+            }
+
+            Alert.alert("Sucesso", "O grupo foi atualizado com sucesso!");
+
+            navigation.navigate('ChatGroup', {
+                typeChat: 'groups',
+                groupName: newGroupName,
+                groupId: groupId, 
+                groupCreator: groupCreator,
+            });
+
+        } catch (error) {
+            Alert.alert("Erro", "Ocorreu um erro ao adicionar os participantes.");
+            console.error(error);
+        }
+    }
+
+    const leaveGroup = async () => {
+        Alert.alert(
+            "Atenção",
+            "Você realmente deseja sair do grupo? Esta ação não pode ser desfeita e você perderá a conversa.",
+            [
+                {
+                    text: "Cancelar",
+                    onPress: () => console.log("Exclusão cancelada"),
+                    style: "cancel", 
+                },
+                {
+                    text: "Sair/Excluir",
+                    onPress: async () => {
+                        try {
+                            const groupRef = doc(db, 'groups', groupId);
+                            const groupSnap = await getDoc(groupRef);
+
+                            if (groupSnap.exists()) {
+                                const groupData = groupSnap.data();
+
+                                // REMOÇÃO DO MEMBRO
+                                var members = groupData.members || [];
+
+                                // TROCA CHAVE IDEA
+                                const messages = groupData.messages || [];
+                                const ideaMember = members.find(member => member.email === user.email);
+                                const oldEncryptedIdea = ideaMember.key;
+                                const publicKey = await getMyPublicKey();
+                                const privateKey = await getPrivateKey();
+                                const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
+
+                                const newIdea = gerarChaveIDEA();
+                                const newKeyMembers = []
+
+                                if (messages) {
+                                    messages.forEach(message => {
+                                        if (message.content) {
+                                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
+                                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                                            message.content = toBase64(encryptedMessage);
+                                        }
+                                    });
+
+                                    await Promise.all(
+                                        members.map(async (member) => {
+                                            const publicKey = await getContactPublicKey(member.email);
+                                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                                            member.key = encryptedIdea;
+                                        })
+                                    );
+                                    
+
+                                    await updateDoc(groupRef, {
+                                        messages: messages,
+                                        members: members
+                                    });
+                                }
+
+                                const memberToRemove = members.find(member => member.email === user.email);
+
+                                if (memberToRemove) {
+                                    await updateDoc(groupRef, {
+                                        members: arrayRemove(memberToRemove)
+                                    });
+
+                                    // Atualiza o estado local para remover o membro da lista
+                                    setGroupMembers(prevMembers => prevMembers.filter(member => member.email !== user.email));
+                                    members = members.filter(member => member.email !== memberToRemove.email);
+
+                                    
+
+                                    if ((groupData.members).length > 0 && memberToRemove.email === groupData.createdBy) {
+                                        await updateDoc(groupRef, {
+                                            createdBy: members[0].email
+                                        });
+                                    }
+
+                                    Alert.alert("Sucesso", "Você saiu deste grupo!");
+                                }
+                            }
+
+                            navigation.pop(2);
+
+                        } catch (error) {
+                            console.error("Erro ao remover o membro:", error);
+                            Alert.alert("Erro", "Ocorreu um erro ao sair do grupo.");
                         }
                     },
                     style: "destructive", 
@@ -261,7 +440,13 @@ const EditGroup = ({ route }) => {
                     source={require('../../../assets/userImage.png')}
                     style={styles.editGroupHeadUserImage} 
                 />
-                <Text style={styles.editGroupHeadTittle}>{groupName}</Text>
+                <TextInput
+                    style={styles.editGroupHeadTittle} // Estilo para o campo de texto
+                    value={newGroupName}
+                    onChangeText={setNewGroupName}
+                    placeholder="Nome do grupo..."
+                    placeholderTextColor={'white'}
+                />
             </View>
 
             <View style={styles.editGroupContactsContainer}>
@@ -272,30 +457,61 @@ const EditGroup = ({ route }) => {
                         </TouchableOpacity>
                     )}
                     <ScrollView>
-                    {groupMembers.map((member, index) => (
-                        <View key={index} style={styles.editGroupContactsContact}>
-                            <Image 
-                                source={require('../../../assets/userImage.png')}
-                                style={styles.editGroupContactsUserImage} 
-                            />
-                            <Text style={styles.editGroupContactsName}>{member.name}</Text>
-                            {user.email === groupCreator && member.email !== user.email && ( 
-                                <TouchableOpacity onPress={() => handleRemoveMember(member)}>
-                                    <Text style={styles.editGroupContactsRemoveButton}>Remover</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    ))}
+                        {/* Renderizar membros do grupo */}
+                        {groupMembers.map((member, index) => (
+                            <View key={`group-${index}`} style={styles.editGroupContactsContact}>
+                                <Image 
+                                    source={require('../../../assets/userImage.png')}
+                                    style={styles.editGroupContactsUserImage} 
+                                />
+                                <Text style={styles.editGroupContactsName}>{member.name}</Text>
+                                {user.email === groupCreator && member.email !== user.email && ( 
+                                    <TouchableOpacity onPress={() => handleRemoveMember(member)}>
+                                        <Text style={styles.editGroupContactsRemoveButton}>Remover</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        ))}
+
+                        {newMembers && newMembers.length > 0 && (
+                            <>
+                                <Text style={styles.editGroupNewMemebrsTittle}>Novos Participantes</Text>
+                                {/* Renderizar contatos selecionados */}
+                                {newMembers.map((contact, index) => (
+                                    <View key={`selected-${index}`} style={styles.editGroupContactsContact}>
+                                        <Image 
+                                            source={require('../../../assets/userImage.png')}
+                                            style={styles.editGroupContactsUserImage} 
+                                        />
+                                        <Text style={styles.editGroupContactsName}>{contact.name}</Text>
+                                        <TouchableOpacity style={styles.editGroupContactsRemoveButton} onPress={() => removeNewParticipant(contact.email)}>
+                                            <Text style={styles.editGroupContactsRemoveButton}>Remover</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </>
+                        )}
+
                     </ScrollView>
+
                 </View>
             </View>
 
             <View style={styles.editGroupButtonContainer}>
                 <View style={styles.editGroupSaveButton}>
-                    <Text style={styles.editGroupButtonTittle}>Excluir/Sair</Text>
+                    <TouchableOpacity style={styles.editGroupButtonTittle} onPress={leaveGroup}>
+                        <Text style={styles.editGroupButtonTittle}>Sair/Excluir</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
+            {user.email === groupCreator && ( 
+                <View style={styles.createGroupButtonContainer}>
+                    <TouchableOpacity style={styles.createGroupSaveButton} onPress={saveChanges}>
+                        <Text style={styles.createGroupButtonTittle}>Salvar</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 };

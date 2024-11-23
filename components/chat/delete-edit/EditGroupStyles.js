@@ -19,16 +19,17 @@ export default StyleSheet.create({
     },
 
     editGroupHead:{
-        width: 100,
+        width: 200,
         height: 100,
         alignSelf: 'center',
-        gap: 8
+        gap: 8,
     },
 
     editGroupHeadTittle: {
         color: '#fff',
         fontSize: 20,
         alignSelf: 'center',
+        textAlign: 'center'
     },
 
     editGroupHeadUserImage: {
@@ -72,7 +73,6 @@ export default StyleSheet.create({
         flexDirection: 'row',
         width: '93%', 
         height: 60,
-        backgroundColor: 'transparent',
         marginVertical: 5, 
         alignSelf: 'center',
         alignItems: 'center',
@@ -91,8 +91,8 @@ export default StyleSheet.create({
 
     editGroupContactsRemoveButton: {
         color: '#B3B3B3',
-        marginLeft: 'auto',
         fontSize: 12,
+        marginLeft: 'auto'
     },
 
     editGroupButtonContainer: {
@@ -119,5 +119,40 @@ export default StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         alignSelf: 'center',
-    }
+    },
+
+    createGroupButtonContainer: {
+        display: 'flex',
+        flexDirection: 'row',
+        alignSelf: 'center',
+        justifyContent: 'flex-end',
+        gap: 20,
+        width: '80%',
+        height: 65,
+        bottom: 0,
+    },
+
+    createGroupSaveButton: {
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        width: 120,
+        height: 40,
+        backgroundColor: 'rgba(89, 107, 178, 0.41)',
+        borderRadius: 10,
+    },
+
+    createGroupButtonTittle: {
+        color: '#fff',
+        fontSize: 18,
+        alignSelf: 'center',
+    },
+
+    editGroupNewMemebrsTittle:{
+        color: '#B3B3B3',
+        fontSize: 12,
+        marginTop: 10,
+        marginBottom: 10,
+        marginLeft: 10,
+    },
 });

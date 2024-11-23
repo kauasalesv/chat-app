@@ -32,18 +32,17 @@ const AddEditContacts = ({ route }) => {
         removeAccents(contact.name.toLowerCase()).includes(removeAccents(searchTerm.toLowerCase()))
     );
 
-    const toggleContactSelection = (contactId) => {
+    const toggleContactSelection = (contact) => {
         setSelectedContacts((prevSelectedContacts) => {
-            if (prevSelectedContacts.includes(contactId)) {
+            if (prevSelectedContacts.some((selected) => selected.email === contact.email)) {
                 // Se o contato já está selecionado, removê-lo
-                return prevSelectedContacts.filter((id) => id !== contactId);
+                return prevSelectedContacts.filter((selected) => selected.email !== contact.email);
             } else {
-                // Caso contrário, adicionar o contato aos selecionados
-                return [...prevSelectedContacts, contactId];
+                // Caso contrário, adicionar o contato inteiro
+                return [...prevSelectedContacts, contact];
             }
         });
-    };
-    
+    };    
 
     return (
         <View style={styles.addEditContactsContainer}>
@@ -83,11 +82,11 @@ const AddEditContacts = ({ route }) => {
                     filteredContacts.map((contact) => (
                         <TouchableOpacity
                             key={contact.id || contact.email} // Use o campo mais confiável e único
-                            onPress={() => toggleContactSelection(contact.id || contact.email)} // Altere conforme necessário
+                            onPress={() => toggleContactSelection(contact)} // Altere conforme necessário
                             style={[
                                 styles.addEditContactsContactsContact,
-                                selectedContacts.includes(contact.id || contact.email) && { backgroundColor: 'rgba(89, 107, 178, 0.41)' } // Cor se selecionado
-                            ]}
+                                selectedContacts.some((selected) => selected.email === contact.email) && { backgroundColor: 'rgba(89, 107, 178, 0.41)' } // Cor se selecionado
+                            ]}                            
                         >
                             <Image 
                                 source={require('../../../assets/userImage.png')}

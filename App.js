@@ -22,8 +22,8 @@ import AddEditContacts from './components/chat/delete-edit/AddEditContacts';
 import ConfirmationMessage from './components/layout/ConfirmationMessage';
 
 const Stack = createStackNavigator();
-// const socket = io('http://192.168.83.206:3000'); // URL do seu servidor
-const socket = io('http://192.168.1.7:3000'); // URL do seu servidor
+// const socket = io('http://192.168.112.206:3000');
+const socket = io('http://192.168.1.7:3000'); 
 
 export default function App() {
   useEffect(() => {
