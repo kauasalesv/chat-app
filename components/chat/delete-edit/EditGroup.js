@@ -203,7 +203,7 @@ const EditGroup = ({ route }) => {
             Alert.alert("Sucesso", "O grupo foi atualizado com sucesso!");
 
             navigation.navigate('ChatGroup', {
-                typeChat: 'groups',
+                typeChat: 'group',
                 groupName: newGroupName,
                 groupId: groupId, 
                 groupCreator: groupCreator,
@@ -214,6 +214,80 @@ const EditGroup = ({ route }) => {
             console.error(error);
         }
     }
+
+
+
+
+
+
+    const changeKey = async () => {
+        try{
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+
+            if (groupSnap.exists()) {
+                const groupData = groupSnap.data();
+
+                var members = groupData.members || [];
+
+                // TROCA CHAVE IDEA
+                const messages = groupData.messages || [];
+                const ideaMember = members.find(member => member.email === user.email);
+                const oldEncryptedIdea = ideaMember.key;
+                const publicKey = await getMyPublicKey();
+                const privateKey = await getPrivateKey();
+                const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
+                const newIdea = gerarChaveIDEA();
+
+                const newKeyMembers = [];
+
+                if (messages) {
+                    messages.forEach(message => {
+                        if (message.content) {
+                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
+                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                            message.content = toBase64(encryptedMessage);
+                        }
+                    });
+
+                    await Promise.all(
+                        members.map(async (member) => {
+                            const publicKey = await getContactPublicKey(member.email);
+                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                            member.key = encryptedIdea;
+                        })
+                    );
+                    
+                    await updateDoc(groupRef, {
+                        messages: messages,
+                        members: members
+                    });
+        
+                }
+            }
+
+            Alert.alert("Sucesso", "A chave do grupo foi atualizada com sucesso!");
+
+            navigation.navigate('ChatGroup', {
+                typeChat: 'group',
+                groupName: newGroupName,
+                groupId: groupId, 
+                groupCreator: groupCreator,
+            });
+
+        } catch (error) {
+            Alert.alert("Erro", "Ocorreu um erro ao atualizar a chave do grupo.");
+            console.error(error);
+        }
+    }
+
+
+
+
+
+
+
+
 
     const leaveGroup = async () => {
         Alert.alert(
@@ -502,6 +576,18 @@ const EditGroup = ({ route }) => {
                     <TouchableOpacity style={styles.editGroupButtonTittle} onPress={leaveGroup}>
                         <Text style={styles.editGroupButtonTittle}>Sair/Excluir</Text>
                     </TouchableOpacity>
+
+
+
+
+                    <TouchableOpacity style={styles.createGroupSaveButton} onPress={changeKey}>
+                        <Text style={styles.createGroupButtonTittle}>Teste Troca Chave</Text>
+                    </TouchableOpacity>
+
+
+
+
+
                 </View>
             </View>
 

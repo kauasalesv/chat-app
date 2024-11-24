@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, Image } from 'react-native';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import styles from './ChatMessagesStyles';
@@ -9,6 +9,7 @@ const ChatMessages = ({ messages }) => {
   const navigation = useNavigation();
   const scrollViewRef = useRef();
   const [contacts, setContacts] = useState([]);
+  const user = auth.currentUser;
 
   const getMessageTime = (time) => {
     if (time && time.seconds) {
@@ -67,6 +68,8 @@ const ChatMessages = ({ messages }) => {
     };
   }, [messages]);
 
+  console.log(messages);
+
   return (
     <View style={styles.chatMessagesContainer}>
       <ScrollView ref={scrollViewRef}>
@@ -96,24 +99,43 @@ const ChatMessages = ({ messages }) => {
 
                 <View
                   style={[
-                    message.from === 'me' ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
-                    message.from === 'other' && message.status === 'pending' ? { backgroundColor: '#565656' } : {}
+                    message.from === user.email ? styles.chatMessagesMyMessage : styles.chatMessagesOtherMessage,
+                    message.from !== user.email && message.status === 'read' ? { backgroundColor: '#CA8B4B' } : {}
                   ]}
                 >
-                  {message.from === 'other' && message.sender ? (
+                  {message.from !== user.email && message.sender ? (
                     <Text style={styles.chatMessagesSenderEmail}>
                       {contact ? contact.name : message.sender}
                     </Text>
                   ) : null}
                   <Text style={styles.chatMessagesMessageText}>{message.text}</Text>
-                  <Text style={styles.chatMessagesTimestamp}>
-                    {isLastMessageFromSender && messageTime && (
-                      <>
-                        {/* Apenas exibe a hora se for a última mensagem do remetente */}
-                      </>
-                    )}
-                    {messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+                  
+                  <View style={styles.timeCheckContainer}>
+                    <Text style={styles.chatMessagesTimestamp}>
+                      {isLastMessageFromSender && messageTime && (
+                        <>
+                          {/* Apenas exibe a hora se for a última mensagem do remetente */}
+                        </>
+                      )}
+                      {messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+
+                    {/* {message.from === user.email && message.status === 'pending' ? (
+                      <Image 
+                        source={require('../../assets/sendMessageImage.png')}
+                        style={styles.checkImage} 
+                      />
+                    ) : null}
+
+                    {message.from === user.email && message.status === 'read' ? (
+                      <Image 
+                        source={require('../../assets/viewMessageImage.png')}
+                        style={styles.checkImage} 
+                      />
+                    ) : null} */}
+
+                  </View>
+
                 </View>
               </View>
             );

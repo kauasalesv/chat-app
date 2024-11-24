@@ -4,6 +4,7 @@ import io from 'socket.io-client';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { auth } from './config/firebase'; // Certifique-se de importar corretamente
+import BackgroundFetch from "react-native-background-fetch";
 
 // Importação dos componentes
 import SignUp from './components/authentication/SignUp';

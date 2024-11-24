@@ -42,6 +42,13 @@ export default StyleSheet.create({
   chatMessagesTimestamp: {
     color: '#373737',  
     fontSize: 10,
+    marginRight: 5,
+  },
+
+  checkImage: {
+    width: 15,
+    height: 15,
+    marginLeft: 'auto',
   },
 
   chatMessagesSenderEmail: {
@@ -53,5 +60,10 @@ export default StyleSheet.create({
     color: 'white',
     alignSelf: 'center',
     marginTop: 10,
+  },
+
+  timeCheckContainer: {
+    display: 'flex',
+    flexDirection: 'row'
   }
 });

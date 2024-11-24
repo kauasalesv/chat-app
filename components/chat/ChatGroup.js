@@ -45,7 +45,7 @@ const ChatGroup = () => {
                 id: messages.length + 1,
                 text: message, 
                 time: new Date(), 
-                from: 'other',
+                from: data.senderId,
                 sender: data.senderId
             };
 
@@ -92,7 +92,7 @@ const ChatGroup = () => {
             id: messages.length + 1, 
             text: messageText, 
             time: new Date(), // Adiciona um timestamp
-            from: 'me', 
+            from: authEmail, 
             sender: authEmail
         };
         setMessages((prevMessages) => [...prevMessages, newMessage]); // Adiciona a mensagem ao estado
@@ -138,7 +138,7 @@ const ChatGroup = () => {
                     id: index + 1,
                     text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada, msg.sender),
                     time: msg.time,
-                    from: 'me',
+                    from: authEmail,
                     sender: authEmail,
                     status: msg.status,
                 }));
@@ -167,7 +167,7 @@ const ChatGroup = () => {
                     id: index + 1,
                     text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chaveCripitografada, msg.sender),
                     time: msg.time,
-                    from: 'other',
+                    from: msg.sender,
                     sender: msg.sender,
                     status: msg.status
                 }));

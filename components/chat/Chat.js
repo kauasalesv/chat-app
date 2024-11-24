@@ -47,7 +47,7 @@ const Chat = () => {
                 id: messages.length + 1,
                 text: message, 
                 time: new Date(), 
-                from: 'other' 
+                from: contactEmail 
             };
 
             if (userEmail !== data.senderId) {
@@ -85,7 +85,7 @@ const Chat = () => {
         const newMessage = { 
             id: messages.length + 1, 
             text: messageText, 
-            from: 'me', 
+            from: user.email, 
             time: new Date() // Adiciona um timestamp
         };
         setMessages((prevMessages) => [...prevMessages, newMessage]); // Adiciona a mensagem ao estado
@@ -124,59 +124,59 @@ const Chat = () => {
         setMessageText('');
     };
 
-    const loadMyMessages = async () => {
-        const userEmail = auth.currentUser.email;
-        const chatDocId = `${userEmail}:${contactEmail}`;
-        const chatRef = doc(db, 'chats', chatDocId);
-        const chatSnap = await getDoc(chatRef);
+    const loadMessages = async () => {
+        const chatDocId1 = `${contactEmail}:${auth.currentUser.email}`;
+        const chatDocId2 = `${auth.currentUser.email}:${contactEmail}`;
 
-        if (chatSnap.exists()) {
-            const chatData = chatSnap.data();
+        const chatRef1 = doc(db, 'chats', chatDocId1);
+        const chatRef2 = doc(db, 'chats', chatDocId2);
+
+        const chatSnap1 = await getDoc(chatRef1);
+        const chatSnap2 = await getDoc(chatRef2);
+
+        if (chatSnap1.exists()) {
+            const chatData = chatSnap1.data();
 
             const myPriviteKey = await getPrivateKey(user.uid);
-            const chaveDescriptografada = await descriptografarRSA(chatData.senderKey, myPriviteKey);
-
-            const loadedMessages = chatData.messages.map((msg, index) => ({
-                id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.senderKey, userEmail, contactEmail),
-                time: msg.time,
-                from: 'me',
-                status: msg.status // Inclui o status
-            }));
-            setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
-
-        } else {
-            //console.log("Nenhuma mensagem encontrada para o usuário.");
-        }
-    };
-
-    const loadContactMessages = async () => {
-        const chatDocId = `${contactEmail}:${auth.currentUser.email}`;
-        const chatRef = doc(db, 'chats', chatDocId);
-        const chatSnap = await getDoc(chatRef);
-
-        if (chatSnap.exists()) {
-            const chatData = chatSnap.data();
-    
-            const myPriviteKey = await getPrivateKey(user.uid);
-            const chaveDescriptografada = await descriptografarRSA(chatData.recipientKey, myPriviteKey);
+            const chaveDescriptografada = await descriptografarRSA(chatData[removeDot(user.email)], myPriviteKey);
 
             // Atualiza o status das mensagens carregadas para 'read'
             const loadedMessages = chatData.messages.map((msg, index) => ({
                 id: index + 1,
-                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData.recipientKey, contactEmail, auth.currentUser.email),
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData[removeDot(msg.recipient)], msg.sender, msg.recipient),
                 time: msg.time,
-                from: 'other',
-                status: 'read' // Atualiza o status para 'read'
+                from: msg.sender,
+                status: msg.sender !== user.email ? 'read' : msg.status
             }));
-    
+            console.log("AAA", loadMessages);
+
             // Atualiza o estado local
             setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
     
             // Atualiza o status das mensagens no Firestore
-            await updateMessagesStatusToRead(chatRef, chatData.messages);
-        } else {
-            //console.log("Nenhuma mensagem encontrada para o contato.");
+            await updateMessagesStatusToRead(chatRef1, chatData.messages);
+
+        } else if (chatSnap2.exists()) {
+            const chatData = chatSnap2.data();
+
+            const myPriviteKey = await getPrivateKey(user.uid);
+            const chaveDescriptografada = await descriptografarRSA(chatData[removeDot(user.email)], myPriviteKey);
+
+            // Atualiza o status das mensagens carregadas para 'read'
+            const loadedMessages = chatData.messages.map((msg, index) => ({
+                id: index + 1,
+                text: descriptografarIDEA(fromBase64(msg.content), fromBase64(chaveDescriptografada), myPriviteKey, chatData[removeDot(msg.recipient)], msg.sender, msg.recipient),
+                time: msg.time,
+                from: msg.sender,
+                status: msg.sender !== user.email ? 'read' : msg.status
+            }));
+    
+            console.log("AAA", loadMessages);
+            // Atualiza o estado local
+            setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
+    
+            // Atualiza o status das mensagens no Firestore
+            await updateMessagesStatusToRead(chatRef2, chatData.messages);        
         }
     };
     
@@ -184,7 +184,7 @@ const Chat = () => {
         try {
             // Atualiza apenas as mensagens que estão com status diferente de 'read'
             const updatedMessages = messages.map((msg) => {
-                if (msg.status !== 'read') {
+                if (msg.status !== 'read' && msg.sender !== user.email) {
                     return { ...msg, status: 'read' };
                 }
                 return msg;
@@ -294,7 +294,7 @@ const Chat = () => {
                 //console.log("EXISTE 1");
                 const chatData = chatDoc1.data();
 
-                const chaveDescriptografada = await descriptografarRSA(chatData.recipientKey, myPriviteKey);
+                const chaveDescriptografada = await descriptografarRSA(chatData[removeDot(user.email)], myPriviteKey);
 
                 const chave = fromBase64(chaveDescriptografada);
                 const criptografada = criptografarIDEA(message, chave);
@@ -311,7 +311,7 @@ const Chat = () => {
                 //console.log("EXISTE 2");
                 const chatData = chatDoc2.data();
 
-                const chaveDescriptografada = await descriptografarRSA(chatData.senderKey, myPriviteKey);
+                const chaveDescriptografada = await descriptografarRSA(chatData[removeDot(user.email)], myPriviteKey);
 
                 const chave = fromBase64(chaveDescriptografada);
                 const criptografada = criptografarIDEA(message, chave);
@@ -399,9 +399,10 @@ const Chat = () => {
         }
     };
 
+    const removeDot = (email) => email.replace(/\./g, ',');
+
     useEffect(() => {
-        loadMyMessages();
-        loadContactMessages();
+        loadMessages();
         getPrivateKey(user.uid);
     }, []);
 

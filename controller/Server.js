@@ -96,33 +96,47 @@ io.on('connection', (socket) => {
     const saveMessageToFirestore = async (message, senderKey, recipientKey, senderEmail, recipientEmail) => {
         try {
             // Cria o ID do documento com base nos e-mails do remetente e do destinatário
-            const chatDocId = `${senderEmail}:${recipientEmail}`;
-            const chatRef = doc(db, 'chats', chatDocId); // Referência ao documento na coleção 'chats'
+            const chatDocId1 = `${senderEmail}:${recipientEmail}`;
+            const chatDocId2 = `${recipientEmail}:${senderEmail}`;
+
+            const chatRef1 = doc(db, 'chats', chatDocId1); // Referência ao documento na coleção 'chats'
+            const chatRef2 = doc(db, 'chats', chatDocId2); // Referência ao documento na coleção 'chats'
 
             // Verifica se o documento já existe
-            const chatSnap = await getDoc(chatRef);
+            const chatSnap1 = await getDoc(chatRef1);
+            const chatSnap2 = await getDoc(chatRef2);
 
             const messageData = {
                 content: message,
                 time: new Date(),
                 sender: senderEmail,
+                recipient: recipientEmail,
                 status: 'pending',
             };
 
-            if (chatSnap.exists()) {
+            if (chatSnap1.exists()) {
                 // O documento já existe, faz o push da nova mensagem no array de messages
-                await updateDoc(chatRef, {
-                    senderKey: senderKey,
-                    recipientKey: recipientKey,
+                await updateDoc(chatRef1, {
+                    [removeDot(senderEmail)]: senderKey,
+                    [removeDot(recipientEmail)]: recipientKey,
                     messages: arrayUnion(messageData) // Adiciona a nova mensagem ao array
                 });
+
+            } else if (chatSnap2.exists()) {
+                // O documento já existe, faz o push da nova mensagem no array de messages
+                await updateDoc(chatRef2, {
+                    [removeDot(senderEmail)]: senderKey,
+                    [removeDot(recipientEmail)]: recipientKey,
+                    messages: arrayUnion(messageData) // Adiciona a nova mensagem ao array
+                });
+
             } else {
                 // O documento não existe, cria um novo
                 //console.log(messageData);
-                await setDoc(chatRef, {
-                    senderKey: senderKey,
-                    recipientKey: recipientKey,
-                    messages: [messageData] // Cria o documento com o array de messages
+                await setDoc(chatRef1, {
+                    [removeDot(senderEmail)]: senderKey,
+                    [removeDot(recipientEmail)]: recipientKey,
+                    messages: arrayUnion(messageData) // Cria o documento com o array de messages
                 });
             }
 
@@ -179,6 +193,7 @@ const getGroupMembers = async (groupId, authenticatedEmail) => {
     return [];
 };
 
+const removeDot = (email) => email.replace(/\./g, ',');
 
 server.listen(3000, () => {
     console.log('Servidor rodando na porta 3000');
