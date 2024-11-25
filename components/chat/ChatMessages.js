@@ -68,7 +68,7 @@ const ChatMessages = ({ messages }) => {
     };
   }, [messages]);
 
-  console.log(messages);
+  //console.log(messages);
 
   return (
     <View style={styles.chatMessagesContainer}>

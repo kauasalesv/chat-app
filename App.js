@@ -3,8 +3,8 @@ import { AppState } from 'react-native';
 import io from 'socket.io-client';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { auth } from './config/firebase'; // Certifique-se de importar corretamente
-import BackgroundFetch from "react-native-background-fetch";
+import { auth, db } from './config/firebase'; // Certifique-se de importar corretamente
+import { Timestamp, getDoc, updateDoc, setDoc, doc } from "firebase/firestore";
 
 // Importação dos componentes
 import SignUp from './components/authentication/SignUp';
@@ -21,10 +21,11 @@ import EditContact from './components/chat/delete-edit/EditContact';
 import EditGroup from './components/chat/delete-edit/EditGroup';
 import AddEditContacts from './components/chat/delete-edit/AddEditContacts';
 import ConfirmationMessage from './components/layout/ConfirmationMessage';
+import ConfirmCode from './components/authentication/ConfirmCode';
 
 const Stack = createStackNavigator();
-// const socket = io('http://192.168.112.206:3000');
-const socket = io('http://192.168.1.7:3000'); 
+const socket = io('http://192.168.119.206:3000');
+// const socket = io('http://192.168.1.7:3000'); 
 
 export default function App() {
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function App() {
         var userEmail = user.email;
         socket.connect(); // Conectar ao socket quando o usuário estiver autenticado
         socket.emit('register', userEmail);
+        saveUserLastTime(user);
         //console.log("\x1b[35m", `Usuário conectado:`);
         //console.log(userEmail);
         
@@ -71,12 +73,49 @@ export default function App() {
     };
   }, []);
 
+  const saveUserLastTime = async (user) => {
+    try {
+        // Cria o ID do documento com base nos e-mails do remetente e do destinatário
+        const docId = `${user.email}`;
+        const chatRef = doc(db, 'userSessions', docId); // Referência ao documento na coleção 'chats'
+
+        // Verifica se o documento já existe
+        const chatSnap = await getDoc(chatRef);
+        const oneWeekInMillis = 7 * 24 * 60 * 60 * 1000; // Milissegundos em uma semana
+        const oneMinuteInMillis = 1 * 60 * 1000; // Milissegundos em um minuto
+        const currentTime = Timestamp.now();
+        
+        if (chatSnap.exists()) {
+            // O documento já existe
+            const existingTime = chatSnap.data().time;
+        
+            if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneWeekInMillis) {
+                // O time existente é inferior a uma semana do atual, atualize o time
+                await updateDoc(chatRef, {
+                    time: currentTime,
+                });
+            } else {
+                console.log("O time atual não é inferior a uma semana do time existente.");
+            }
+        } else {
+            // O documento não existe, cria um novo
+            await setDoc(chatRef, {
+                time: currentTime,
+            });
+        }        
+        console.log(`Sessão persistida no firestore para ${user.email}`);
+    } catch (error) {
+        console.error("Erro ao salvar mensagem no Firestore:", error);
+    }
+  };
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="SignIn">
         {/* Tela Autenticação */}
         <Stack.Screen name="SignIn" component={SignIn} options={{ headerShown: false, animationEnabled: false }} />
         <Stack.Screen name="SignUp" component={SignUp} options={{ headerShown: false, animationEnabled: false }} />
+        <Stack.Screen name="ConfirmCode" component={ConfirmCode} options={{ headerShown: false, animationEnabled: false }} />
         {/* Tela Home */}
         <Stack.Screen name="Home" component={Home} options={{ headerShown: false, animationEnabled: false }} />
         <Stack.Screen name="CreateContact" component={CreateContact} options={{ headerShown: false, animationEnabled: false }} />

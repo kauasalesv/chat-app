@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ToastAndroid, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ToastAndroid, ScrollView, Alert, BackHandler } from 'react-native';
 import { useNavigation } from '@react-navigation/native'; // Importação para navegação
-import { doc, getDoc, setDoc, updateDoc, getDocs, where, query, collection, arrayUnion } from 'firebase/firestore';
-import { auth, db } from '../../config/firebase'; 
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import axios from 'axios';
 import * as Keychain from 'react-native-keychain';
+import { auth, db } from '../../config/firebase'; 
+import { doc, getDoc } from 'firebase/firestore';
 import styles from './SignInStyles';
 
 const SignIn = () => {
@@ -12,27 +13,36 @@ const SignIn = () => {
     const [password, setPassword] = useState('');
     const navigation = useNavigation(); // Inicializando a navegação
 
+    // Interceptando o botão de voltar para fechar o aplicativo
+    useEffect(() => {
+        const backAction = () => {
+            BackHandler.exitApp(); // Fecha o aplicativo
+            return true; // Impede o comportamento padrão (voltar para a tela anterior)
+        };
+
+        // Adiciona o listener para o evento de voltar
+        BackHandler.addEventListener('hardwareBackPress', backAction);
+
+        // Remove o listener quando o componente for desmontado
+        return () => {
+            BackHandler.removeEventListener('hardwareBackPress', backAction);
+        };
+    }, []);
+
     const loginFirebase = async () => {
         try{
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            const publicKey =  await getMyPublicKey();
-            const privateKey =  await getPrivateKey();
+            // Fazendo a requisição para o servidor
+            // const response = await axios.post('http://192.168.1.7:3000/generate-code', { email });
+            const response = await axios.post('http://192.168.119.206:3000/generate-code', { email });
+            //console.log('response',response)
+            if(response.status === 200){
+                navigation.navigate('ConfirmCode', { userEmail: user.email, userPassword: user.password });
+            }
 
-            console.log("\n\n");
-            console.log("\x1b[33m", "Login bem-sucedido:");
-            console.log(user);
-            console.log("\x1b[33m", "Chave Pública:")
-            console.log(publicKey);
-            console.log("\x1b[33m", "Chave Privada:")
-            console.log(privateKey);
-            console.log("\n\n");
-
-            // Substitui a tela de autenticação pela tela "Home" e passa o usuário autenticado
-            navigation.replace('Home', { userEmail: user.email, userId: user.uid });
-        }
-        catch(error) {
+        } catch(error) {
             console.warn("Falha no login:", error);
             ToastAndroid.show("Falha na autenticação.", ToastAndroid.SHORT);
 
@@ -43,42 +53,6 @@ const SignIn = () => {
                 [{ text: "OK" }] // Botão do alerta
             );
         };
-    };    
-
-    const getMyPublicKey = async () => {
-        try {
-            // Obtenha o UID do usuário autenticado
-            const userId = auth.currentUser.uid; 
-            const userDocRef = doc(db, 'users', userId); // Referência direta ao documento do usuário
-            const userDoc = await getDoc(userDocRef); // Obtém o documento
-    
-            if (userDoc.exists()) {
-                return userDoc.data().publicKey; // Acesse a chave pública
-            } else {
-                console.log("Documento do usuário não encontrado.");
-                return null; // Retorna null se o documento não existir
-            }
-        } catch (error) {
-            console.error("Erro ao buscar minha chave pública:", error);
-            return null; // Retorna null em caso de erro
-        }
-    };
-
-    const getPrivateKey = async () => {
-        try {
-            const userId = auth.currentUser.uid; 
-            const credentials = await Keychain.getGenericPassword({
-                service: `privateKey_${userId}`, // Adicione o serviço aqui
-            });
-            if (credentials) {
-                return credentials.password; // Retorna a chave privada
-            } else {
-                console.log('Nenhuma chave privada encontrada.');
-                return null;
-            }
-        } catch (error) {
-            console.error('Erro ao recuperar a chave privada:', error);
-        }
     };
 
     return (

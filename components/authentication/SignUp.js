@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ToastAndroid, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ToastAndroid, ScrollView, Alert, BackHandler } from 'react-native';
 import { useNavigation } from '@react-navigation/native'; // Importação para navegação
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { setDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase'; 
 import Rsa from 'react-native-rsa-native';
+import axios from 'axios';
 import * as Keychain from 'react-native-keychain';
 import styles from './SignUpStyles';
 
@@ -13,6 +14,22 @@ const SignUp = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const navigation = useNavigation(); // Inicializando navegação
+
+    useEffect(() => {
+        // Intercepta o botão de voltar para fechar a aplicação
+        const backAction = () => {
+            BackHandler.exitApp(); // Fecha o aplicativo
+            return true; // Previne a navegação para a tela anterior
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            backAction
+        );
+
+        // Limpa o evento ao sair da tela
+        return () => backHandler.remove();
+    }, []);
 
     const signUpFirebase = () => {
         if (password !== confirmPassword) {
@@ -23,9 +40,9 @@ const SignUp = () => {
         createUserWithEmailAndPassword(auth, email, password)
             .then(async (userCredential) => {
                 const user = userCredential.user;
-                console.log("\n\n");
-                console.log("\x1b[33m", "Cadastro bem-sucedido:");
-                console.log(user);
+                // console.log("\n\n");
+                // console.log("\x1b[33m", "Cadastro bem-sucedido:");
+                // console.log(user);
                 
                 const { publicKey, privateKey } = await generateKeys();
                 await savePrivateKey(user.uid, privateKey);
@@ -39,19 +56,27 @@ const SignUp = () => {
                 const userRef = doc(db, 'users', user.uid);
                 await setDoc(userRef, userDoc)
                     .then(() => {
-                        console.log("\x1b[33m", "Usuário autenticado com sucesso!");
-                        console.log("\x1b[33m", "Chave Pública:")
-                        console.log(publicKey);
-                        console.log("\x1b[33m", "Chave Privada:")
-                        console.log(privateKey);
-                        console.log("\n\n");
+                        // console.log("\x1b[33m", "Usuário autenticado com sucesso!");
+                        // console.log("\x1b[33m", "Chave Pública:")
+                        // console.log(publicKey);
+                        // console.log("\x1b[33m", "Chave Privada:")
+                        // console.log(privateKey);
+                        // console.log("\n\n");
                     })
                     .catch((error) => {
                         console.error("Erro ao salvar usuário:", error);
                     });
     
                 // Substitui a tela de cadastro pela tela "Home"
-                navigation.replace('Home', { userEmail: user.email, userId: user.uid });
+                //navigation.replace('Home', { userEmail: user.email, userId: user.uid });
+
+                // const response = await axios.post('http://192.168.1.7:3000/generate-code', { email });
+                const response = await axios.post('http://192.168.119.206:3000/generate-code', { email });
+
+                //console.log('response',response)
+                if(response.status===200){
+                    navigation.navigate('ConfirmCode', { userEmail: user.email, userPassword: user.password });
+                }
             })
             .catch((error) => {
                 console.warn("Falha no cadastro:", error);
@@ -78,30 +103,13 @@ const SignUp = () => {
             await Keychain.setGenericPassword(`privateKey_${userId}`, privateKey, {
                 service: `privateKey_${userId}`, // Adicione o serviço aqui
             });
-            console.log("\x1b[33m", 'Chave privada salva com sucesso!');
+            //console.log("\x1b[33m", 'Chave privada salva com sucesso!');
 
         } catch (error) {
             console.error('Erro ao salvar a chave privada:', error);
         }
     };    
     
-    /*/ Gerar chaves
-    const { publicKey, privateKey } = await generateKeys();
-    console.log('Chave Pública:', publicKey);
-    console.log('Chave Privada:', privateKey);
-  
-    // Mensagem para criptografar
-    const message = 'Esta é uma mensagem secreta.';
-  
-    // Criptografar mensagem
-    const encryptedMessage = await encryptMessage(message, publicKey);
-    console.log('Mensagem Criptografada:', encryptedMessage);
-  
-    // Descriptografar mensagem
-    const decryptedMessage = await decryptMessage(encryptedMessage, privateKey);
-    console.log('Mensagem Descriptografada:', decryptedMessage);*/
-
-
     return (
         <ScrollView style={styles.signUpContainer}>
             <Text style={styles.signUpHeadTittle}> CADASTRO </Text>
