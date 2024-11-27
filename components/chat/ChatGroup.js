@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, Timestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Buffer } from 'buffer';
@@ -14,8 +14,8 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-const socket = io('http://192.168.119.206:3000');
-// const socket = io('http://192.168.1.7:3000'); 
+// const socket = io('http://192.168.162.206:3000');
+const socket = io('http://192.168.1.7:3000'); 
 
 const IDEA = require("idea-cipher");
 
@@ -27,6 +27,7 @@ const ChatGroup = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const { typeChat, groupId, groupName, groupCreator } = route.params;
+    const user = auth.currentUser;
 
     useEffect(() => {
         const userEmail = auth.currentUser.email;
@@ -330,9 +331,133 @@ const ChatGroup = () => {
         }
     };
 
+    const periodicChangeKey = async (user) => {
+        try {
+            // Cria o ID do documento com base nos e-mails do remetente e do destinatário
+            const docId = `${user.email}`;
+            const chatRef = doc(db, 'userSessions', docId); // Referência ao documento na coleção 'chats'
+    
+            // Verifica se o documento já existe
+            const chatSnap = await getDoc(chatRef);
+            const oneWeekInMillis = 7 * 24 * 60 * 60 * 1000; // Milissegundos em uma semana
+            const oneMinuteInMillis = 1 * 60 * 1000; // Milissegundos em um minuto
+            const currentTime = Timestamp.now();
+            
+            if (chatSnap.exists()) {
+                // O documento já existe
+                const existingTime = chatSnap.data().time;
+            
+                if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneWeekInMillis) {
+                    await changeKey();
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao salvar mensagem no Firestore:", error);
+        }
+    }
+    
+    const changeKey = async () => {
+        try{
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+
+            if (groupSnap.exists()) {
+                const groupData = groupSnap.data();
+
+                // Estados iniciais
+                const oldMembers = groupData.members || [];
+                const oldMessages = groupData.messages || [];
+
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+
+                const ideaMember = members.find(member => member.email === user.email);
+                const oldEncryptedIdea = ideaMember.key;
+                const publicKey = await getMyPublicKey();
+                const privateKey = await getPrivateKey(user.uid);
+                const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
+                const newIdea = gerarChaveIDEA();
+
+                const newKeyMembers = [];
+
+                if (messages) {
+                    // Atualizar mensagens
+                    messages = messages.map(message => {
+                        if (message.content) {
+                            const decryptedMessage = descriptografarIDEA2(
+                                fromBase64(message.content),
+                                fromBase64(oldDecryptedIdea)
+                            );
+                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                            return { ...message, content: toBase64(encryptedMessage) };
+                        }
+                        return message;
+                    });
+
+                    // Atualizar chaves dos membros
+                    members = await Promise.all(
+                        members.map(async member => {
+                            const publicKey = await getContactPublicKey(member.email);
+                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                            return { ...member, key: encryptedIdea };
+                        })
+                    );
+                    
+                    await updateDoc(groupRef, {
+                        messages: messages,
+                        members: members
+                    });
+        
+                }
+
+                // Logs para depuração
+                console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
+            }
+
+            //Alert.alert("Sucesso", "A chave do grupo foi atualizada com sucesso!");
+
+        } catch (error) {
+            //Alert.alert("Erro", "Ocorreu um erro ao atualizar a chave do grupo.");
+            console.error(error);
+        }
+    }
+
+    function gerarChaveIDEA() {
+        return Buffer.from(Array.from({ length: 16 }, () => Math.floor(Math.random() * 256)));
+    }
+
+    const getContactPublicKey = async (contactEmail) => {
+        const usersRef = collection(db, 'users'); 
+        const q = query(usersRef, where('email', '==', contactEmail)); 
+        const querySnapshot = await getDocs(q); 
+        let recipientPublicKey = null;
+
+        if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            recipientPublicKey = userDoc.data().publicKey; 
+            return recipientPublicKey;
+        } else {
+            console.log("Nenhum usuário encontrado com esse e-mail.");
+            return null; 
+        }
+    };
+
+    // Função para descriptografar a mensagem com IDEA
+    function descriptografarIDEA2(criptografada, chave, chavePrivada, chaveCriptografada, senderEmail) {
+        const idea = new IDEA(chave);
+        const descriptografada = idea.decrypt(criptografada);
+        return descriptografada.toString('utf-8');
+    }
+
     useEffect(() => {
         loadMyMessages();
         loadContactMessages();
+        periodicChangeKey(user);
     }, []);
 
     useEffect(() => {

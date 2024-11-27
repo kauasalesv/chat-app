@@ -32,8 +32,8 @@ const ConfirmCode = ({ route }) => {
     setLoading(true);
 
     try {
-      // const response = await axios.post('http://192.168.1.7:3000/verificar-codigo', { email: userEmail, code });
-      const response = await axios.post('http://192.168.119.206:3000/verificar-codigo', { email: userEmail, code });
+      const response = await axios.post('http://192.168.1.7:3000/verificar-codigo', { email: userEmail, code });
+      // const response = await axios.post('http://192.168.162.206:3000/verificar-codigo', { email: userEmail, code });
 
       if (response.status === 200) {
         const publicKey = await getMyPublicKey();

@@ -37,11 +37,20 @@ const HomeChats = ({ searchTerm }) => {
             const chatRef = doc(db, 'chats', chatDocId);
             const chatSnap = await getDoc(chatRef);
 
+            const chatDocId2 = `${userEmail}:${contact.email}`; 
+            const chatRef2 = doc(db, 'chats', chatDocId2);
+            const chatSnap2 = await getDoc(chatRef2);
+
             if (chatSnap.exists()) {
                 const chatData = chatSnap.data();
-                const pendingCount = chatData.messages.filter(msg => msg.status === 'pending').length; 
+                const pendingCount = chatData.messages.filter(msg => msg.status === 'pending' && msg.recipient === userEmail).length;
                 return { ...contact, pendingCount }; 
-            } else {
+            } else if (chatSnap2.exists()) {
+                const chatData = chatSnap2.data();
+                const pendingCount = chatData.messages.filter(msg => msg.status === 'pending' && msg.recipient === userEmail).length;
+                return { ...contact, pendingCount };
+            }
+            else {
                 return { ...contact, pendingCount: 0 }; 
             }
         }));
@@ -112,6 +121,8 @@ const HomeChats = ({ searchTerm }) => {
     const handleContactPress = (contact) => {
         navigation.navigate('Chat', { typeChat: 'chat', contactName: contact.name, contactEmail: contact.email });
     };
+
+    //console.log(contacts);
 
     return (
         <View style={styles.homeChatsContainer}>

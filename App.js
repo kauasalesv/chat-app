@@ -24,8 +24,8 @@ import ConfirmationMessage from './components/layout/ConfirmationMessage';
 import ConfirmCode from './components/authentication/ConfirmCode';
 
 const Stack = createStackNavigator();
-const socket = io('http://192.168.119.206:3000');
-// const socket = io('http://192.168.1.7:3000'); 
+// const socket = io('http://192.168.162.206:3000');
+const socket = io('http://192.168.1.7:3000'); 
 
 export default function App() {
   useEffect(() => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { doc, getDoc, setDoc, updateDoc, getDocs, where, query, collection, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocs, where, query, collection, arrayUnion, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Buffer } from 'buffer';
@@ -14,8 +14,8 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-const socket = io('http://192.168.119.206:3000');
-// const socket = io('http://192.168.1.7:3000'); 
+// const socket = io('http://192.168.162.206:3000');
+const socket = io('http://192.168.1.7:3000'); 
 
 const IDEA = require("idea-cipher");
 
@@ -58,10 +58,15 @@ const Chat = () => {
                 const chatRef = doc(db, 'chats', chatDocId);
                 const chatSnap = await getDoc(chatRef);
 
+                const chatDocId2 = `${contactEmail}:${userEmail}`;
+                const chatRef2 = doc(db, 'chats', chatDocId2);
+                const chatSnap2 = await getDoc(chatRef2);
+
                 if (chatSnap.exists()) {
                     const chatData = chatSnap.data();
                     const updatedMessages = chatData.messages.map((msg) => {
-                        if (msg.status === 'pending') {
+                        if (msg.status === 'pending' && msg.sender !== user.email) {
+                            console.log(msg);
                             return { ...msg, status: 'read' }; // Atualiza status de pending para read
                         }
                         return msg;
@@ -69,6 +74,21 @@ const Chat = () => {
                     
                     // Atualiza as mensagens no Firestore
                     await updateDoc(chatRef, {
+                        messages: updatedMessages
+                    });
+                } else if (chatSnap2.exists()) {
+                    console.log("EXISTE 2");
+
+                    const chatData = chatSnap2.data();
+                    const updatedMessages = chatData.messages.map((msg) => {
+                        if (msg.status === 'pending' && msg.sender !== user.email) {
+                            return { ...msg, status: 'read' }; // Atualiza status de pending para read
+                        }
+                        return msg;
+                    });
+                    
+                    // Atualiza as mensagens no Firestore
+                    await updateDoc(chatRef2, {
                         messages: updatedMessages
                     });
                 }
@@ -80,7 +100,6 @@ const Chat = () => {
         };
     }, []);
     
-
     const sendMessage = async () => {
         const newMessage = { 
             id: messages.length + 1, 
@@ -171,7 +190,7 @@ const Chat = () => {
                 status: msg.sender !== user.email ? 'read' : msg.status
             }));
     
-            console.log("AAA", loadMessages);
+            //console.log("AAA", loadMessages);
             // Atualiza o estado local
             setMessages((prevMessages) => [...loadedMessages, ...prevMessages]);
     
@@ -401,9 +420,214 @@ const Chat = () => {
 
     const removeDot = (email) => email.replace(/\./g, ',');
 
+    const periodicChangeKey = async (user) => {
+        try {
+            // Cria o ID do documento com base nos e-mails do remetente e do destinatário
+            const docId = `${user.email}`;
+            const chatRef = doc(db, 'userSessions', docId); // Referência ao documento na coleção 'chats'
+    
+            // Verifica se o documento já existe
+            const chatSnap = await getDoc(chatRef);
+            const oneWeekInMillis = 7 * 24 * 60 * 60 * 1000; // Milissegundos em uma semana
+            const oneMinuteInMillis = 1 * 60 * 1000; // Milissegundos em um minuto
+            const currentTime = Timestamp.now();
+            
+            if (chatSnap.exists()) {
+                // O documento já existe
+                const existingTime = chatSnap.data().time;
+            
+                if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneWeekInMillis) {
+                    await changeKey();
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao salvar mensagem no Firestore:", error);
+        }
+    }
+    
+    const changeKey = async () => {
+        try{
+            // Cria o ID do documento com base nos e-mails do remetente e do destinatário
+            const chatDocId1 = `${user.email}:${contactEmail}`;
+            const chatDocId2 = `${contactEmail}:${user.email}`;
+
+            const chatRef1 = doc(db, 'chats', chatDocId1); // Referência ao documento na coleção 'chats'
+            const chatRef2 = doc(db, 'chats', chatDocId2); // Referência ao documento na coleção 'chats'
+
+            // Verifica se o documento já existe
+            const chatSnap1 = await getDoc(chatRef1);
+            const chatSnap2 = await getDoc(chatRef2);
+
+            if (chatSnap1.exists()) {
+                const chatData = chatSnap1.data();
+                //console.log(chatData[removeDot(user.email)]);
+
+                // TROCA CHAVE IDEA
+                // Estados iniciais
+                const oldMembers = [
+                    { email: user.email, key: chatData[removeDot(user.email)] },
+                    { email: contactEmail, key: chatData[removeDot(contactEmail)] }
+                ];                
+                const oldMessages = chatData.messages || [];
+
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+
+                const oldEncryptedIdea = chatData[removeDot(user.email)];
+                const publicKey = await getMyPublicKey();
+                const privateKey = await getPrivateKey(user.uid);
+                const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
+                const newIdea = gerarChaveIDEA();
+
+                const newKeyMembers = [];
+
+                if (messages) {
+                    // Atualizar mensagens
+                    messages = messages.map(message => {
+                        if (message.content) {
+                            const decryptedMessage = descriptografarIDEA2(
+                                fromBase64(message.content),
+                                fromBase64(oldDecryptedIdea)
+                            );
+                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                            return { ...message, content: toBase64(encryptedMessage) };
+                        }
+                        return message;
+                    });
+
+                    // Atualizar chaves dos membros
+                    members = await Promise.all(
+                        members.map(async member => {
+                            const publicKey = await getContactPublicKey(member.email);
+                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                            return { ...member, key: encryptedIdea };
+                        })
+                    );
+                    
+                    await updateDoc(chatRef1, {
+                        [removeDot(user.email)]: members[0].key,
+                        [removeDot(contactEmail)]: members[1].key,
+                        messages: messages,
+                    });
+        
+                }
+
+                // Logs para depuração
+                console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
+
+            } else if (chatSnap2.exists()) {
+                const chatData = chatSnap2.data();
+
+                // TROCA CHAVE IDEA
+                // Estados iniciais
+                const oldMembers = [
+                    { email: user.email, key: chatData[removeDot(user.email)] },
+                    { email: contactEmail, key: chatData[removeDot(contactEmail)] }
+                ];                
+                const oldMessages = chatData.messages || [];
+
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+
+                const oldEncryptedIdea = chatData[removeDot(user.email)];
+                const publicKey = await getMyPublicKey();
+                const privateKey = await getPrivateKey(user.uid);
+                const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
+                const newIdea = gerarChaveIDEA();
+
+                const newKeyMembers = [];
+
+                if (messages) {
+                    // Atualizar mensagens
+                    messages = messages.map(message => {
+                        if (message.content) {
+                            const decryptedMessage = descriptografarIDEA2(
+                                fromBase64(message.content),
+                                fromBase64(oldDecryptedIdea)
+                            );
+                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                            return { ...message, content: toBase64(encryptedMessage) };
+                        }
+                        return message;
+                    });
+
+                    // Atualizar chaves dos membros
+                    members = await Promise.all(
+                        members.map(async member => {
+                            const publicKey = await getContactPublicKey(member.email);
+                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                            return { ...member, key: encryptedIdea };
+                        })
+                    );
+                    
+                    await updateDoc(chatRef2, {
+                        [removeDot(user.email)]: members[0].key,
+                        [removeDot(contactEmail)]: members[1].key,
+                        messages: messages,
+                    });
+            }
+
+            // Logs para depuração
+            console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+            console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+            console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+            console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+            console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+            console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
+        }
+            //Alert.alert("Sucesso", "A chave da conversa foi atualizada com sucesso!");
+
+        } catch (error) {
+            //Alert.alert("Erro", "Ocorreu um erro ao atualizar a chave da conversa.");
+            console.error(error);
+        }
+    }
+
+    // Função para converter Uint8Array ou Buffer para base64
+    function toBase64(data) {
+        return Buffer.from(data).toString('base64');
+    }
+
+    // Função para converter base64 de volta para Uint8Array
+    function fromBase64(base64String) {
+        return new Uint8Array(Buffer.from(base64String, 'base64'));
+    }
+
+    function gerarChaveIDEA() {
+        return Buffer.from(Array.from({ length: 16 }, () => Math.floor(Math.random() * 256)));
+    }
+
+    // Função para descriptografar a mensagem com IDEA
+    function descriptografarIDEA2(criptografada, chave, chavePrivada, chaveCriptografada, senderEmail) {
+        const idea = new IDEA(chave);
+        const descriptografada = idea.decrypt(criptografada);
+        // console.log('\n\n');
+        // console.log("\x1b[34m", "Email remetente:");
+        // console.log(senderEmail);
+        // console.log("\x1b[34m", "Mensagem criptografada:");
+        // console.log(toBase64(criptografada));
+        // console.log("\x1b[34m", "Chave IDEA criptografada:");
+        // console.log(chaveCriptografada);
+        // console.log("\x1b[34m", "Chave privada RSA:");
+        // console.log(chavePrivada);
+        // console.log("\x1b[34m", "Chave IDEA descriptografada:");
+        // console.log(toBase64(chave));
+        // console.log("\x1b[34m", "Mensagem descriptografada:");
+        // console.log(descriptografada.toString('utf-8'));
+        // console.log('\n\n');
+
+        return descriptografada.toString('utf-8');
+    }
+
     useEffect(() => {
         loadMessages();
         getPrivateKey(user.uid);
+        periodicChangeKey(user);
     }, []);
 
     useEffect(() => {

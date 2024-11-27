@@ -67,11 +67,11 @@ const EditGroup = ({ route }) => {
             [
                 {
                     text: "Cancelar",
-                    onPress: () => console.log("Exclusão cancelada"),
+                    onPress: () => console.log("Remoção cancelada"),
                     style: "cancel", 
                 },
                 {
-                    text: "Excluir",
+                    text: "Remover",
                     onPress: async () => {
                         try {
                             const groupRef = doc(db, 'groups', groupId);
@@ -80,25 +80,14 @@ const EditGroup = ({ route }) => {
                             if (groupSnap.exists()) {
                                 const groupData = groupSnap.data();
 
-                                // REMOÇÃO DO MEMBRO
-                                var members = groupData.members || [];
-
-                                const memberToRemove = members.find(member => member.email === chooseMember.email);
-
-                                if (memberToRemove) {
-                                    await updateDoc(groupRef, {
-                                        members: arrayRemove(memberToRemove)
-                                    });
-
-                                    // Atualiza o estado local para remover o membro da lista
-                                    setGroupMembers(prevMembers => prevMembers.filter(member => member.email !== chooseMember.email));
-                                    members = members.filter(member => member.email !== memberToRemove.email);
-
-                                    Alert.alert("Sucesso", "O membro foi removido com sucesso!");
-                                }
+                                // Estados iniciais
+                                const oldMembers = groupData.members || [];
+                                const oldMessages = groupData.messages || [];
+                    
+                                let members = [...oldMembers]; // Clonando para modificar
+                                let messages = [...oldMessages]; // Clonando para modificar
 
                                 // TROCA CHAVE IDEA
-                                const messages = groupData.messages || [];
                                 const ideaMember = members.find(member => member.email === user.email);
                                 const oldEncryptedIdea = ideaMember.key;
                                 const publicKey = await getMyPublicKey();
@@ -109,29 +98,52 @@ const EditGroup = ({ route }) => {
                                 const newKeyMembers = []
 
                                 if (messages) {
-                                    messages.forEach(message => {
+                                    // Atualizar mensagens
+                                    messages = messages.map(message => {
                                         if (message.content) {
-                                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
+                                            const decryptedMessage = descriptografarIDEA(
+                                                fromBase64(message.content),
+                                                fromBase64(oldDecryptedIdea)
+                                            );
                                             const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
-                                            message.content = toBase64(encryptedMessage);
+                                            return { ...message, content: toBase64(encryptedMessage) };
                                         }
+                                        return message;
                                     });
-
-                                    await Promise.all(
-                                        members.map(async (member) => {
+                        
+                                    // Atualizar chaves dos membros
+                                    members = await Promise.all(
+                                        members.map(async member => {
                                             const publicKey = await getContactPublicKey(member.email);
                                             const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
-                                            member.key = encryptedIdea;
+                                            return { ...member, key: encryptedIdea };
                                         })
                                     );
                                     
+                                    const memberToRemove = members.find(member => member.email === chooseMember.email);
 
-                                    await updateDoc(groupRef, {
-                                        messages: messages,
-                                        members: members
-                                    });
+                                    if (memberToRemove) {
+                                        members = members.filter(member => member.email !== memberToRemove.email);
+
+                                        await updateDoc(groupRef, {
+                                            members: members,
+                                            messages: messages
+                                        });
+    
+                                        // Atualiza o estado local para remover o membro da lista
+                                        setGroupMembers(prevMembers => prevMembers.filter(member => member.email !== chooseMember.email));
+    
+                                        Alert.alert("Sucesso", "O membro foi removido com sucesso!");
+                                    }
                                 }
 
+                                // Logs para depuração
+                                console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                                console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                                console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                                console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                                console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                                console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
                             }
 
                         } catch (error) {
@@ -146,148 +158,167 @@ const EditGroup = ({ route }) => {
     };
 
     const saveChanges = async () => {
-        try{
+        try {
             const groupRef = doc(db, 'groups', groupId);
             const groupSnap = await getDoc(groupRef);
-
+    
             if (groupSnap.exists()) {
                 const groupData = groupSnap.data();
-
-                var members = groupData.members || [];
-
-                // TROCA CHAVE IDEA
-                const messages = groupData.messages || [];
+    
+                // Estados iniciais
+                const oldMembers = groupData.members || [];
+                const oldMessages = groupData.messages || [];
+                const oldGroupName = groupData.name || "";
+    
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+    
+                // TROCA DE CHAVE IDEA
                 const ideaMember = members.find(member => member.email === user.email);
+                if (!ideaMember) {
+                    Alert.alert("Erro", "Você não faz parte do grupo.");
+                    return;
+                }
+    
                 const oldEncryptedIdea = ideaMember.key;
-                const publicKey = await getMyPublicKey();
                 const privateKey = await getPrivateKey();
                 const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
                 const newIdea = gerarChaveIDEA();
-
-                const newKeyMembers = [];
-
-                if (messages) {
-                    messages.forEach(message => {
-                        if (message.content) {
-                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
-                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
-                            message.content = toBase64(encryptedMessage);
-                        }
-                    });
-
-                    await Promise.all(
-                        members.map(async (member) => {
-                            const publicKey = await getContactPublicKey(member.email);
-                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
-                            member.key = encryptedIdea;
-                        })
-                    );
-                    
-                    if (selectedContacts) {
-                        const newMembers = await addUpdateMembers(toBase64(newIdea), selectedContacts);
-
-                        members.push(...newMembers);
-
-                        await updateDoc(groupRef, {
-                            messages: messages,
-                            members: members
-                        });
+    
+                // Atualizar mensagens
+                messages = messages.map(message => {
+                    if (message.content) {
+                        const decryptedMessage = descriptografarIDEA(
+                            fromBase64(message.content),
+                            fromBase64(oldDecryptedIdea)
+                        );
+                        const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                        return { ...message, content: toBase64(encryptedMessage) };
                     }
-
-                    await updateDoc(groupRef, {
-                        name: newGroupName
-                    });
+                    return message;
+                });
+    
+                // Atualizar chaves dos membros
+                members = await Promise.all(
+                    members.map(async member => {
+                        const publicKey = await getContactPublicKey(member.email);
+                        const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                        return { ...member, key: encryptedIdea };
+                    })
+                );
+    
+                // Adicionar novos membros (se houver)
+                if (selectedContacts) {
+                    const newMembers = await addUpdateMembers(toBase64(newIdea), selectedContacts);
+                    members.push(...newMembers);
                 }
+    
+                // Atualizar o Firestore
+                await updateDoc(groupRef, {
+                    name: newGroupName,
+                    messages: messages,
+                    members: members,
+                });
+    
+                // Logs para depuração
+                console.log("\x1b[32m", "Estado inicial do nome do grupo:", "\x1b[37m", oldGroupName);
+                console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                console.log("\x1b[32m", "Estado final do nome do grupo:", "\x1b[37m", newGroupName);
+                console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
+    
+                Alert.alert("Sucesso", "O grupo foi atualizado com sucesso!");
+    
+                navigation.navigate('ChatGroup', {
+                    typeChat: 'group',
+                    groupName: newGroupName,
+                    groupId: groupId,
+                    groupCreator: groupCreator,
+                });
             }
-
-            Alert.alert("Sucesso", "O grupo foi atualizado com sucesso!");
-
-            navigation.navigate('ChatGroup', {
-                typeChat: 'group',
-                groupName: newGroupName,
-                groupId: groupId, 
-                groupCreator: groupCreator,
-            });
-
         } catch (error) {
             Alert.alert("Erro", "Ocorreu um erro ao adicionar os participantes.");
             console.error(error);
         }
-    }
-
-
-
-
-
+    };    
 
     const changeKey = async () => {
-        try{
+        try {
             const groupRef = doc(db, 'groups', groupId);
             const groupSnap = await getDoc(groupRef);
 
             if (groupSnap.exists()) {
                 const groupData = groupSnap.data();
 
-                var members = groupData.members || [];
+                // Estados iniciais
+                const oldMembers = groupData.members || [];
+                const oldMessages = groupData.messages || [];
 
-                // TROCA CHAVE IDEA
-                const messages = groupData.messages || [];
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+
+                // TROCA DE CHAVE IDEA
                 const ideaMember = members.find(member => member.email === user.email);
+                if (!ideaMember) {
+                    Alert.alert("Erro", "Você não faz parte do grupo.");
+                    return;
+                }
+
                 const oldEncryptedIdea = ideaMember.key;
-                const publicKey = await getMyPublicKey();
                 const privateKey = await getPrivateKey();
                 const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
                 const newIdea = gerarChaveIDEA();
 
-                const newKeyMembers = [];
+                // Atualizar mensagens
+                messages = messages.map(message => {
+                    if (message.content) {
+                        const decryptedMessage = descriptografarIDEA(
+                            fromBase64(message.content),
+                            fromBase64(oldDecryptedIdea)
+                        );
+                        const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                        return { ...message, content: toBase64(encryptedMessage) };
+                    }
+                    return message;
+                });
 
-                if (messages) {
-                    messages.forEach(message => {
-                        if (message.content) {
-                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
-                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
-                            message.content = toBase64(encryptedMessage);
-                        }
-                    });
+                // Atualizar chaves dos membros
+                members = await Promise.all(
+                    members.map(async member => {
+                        const publicKey = await getContactPublicKey(member.email);
+                        const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
+                        return { ...member, key: encryptedIdea };
+                    })
+                );
 
-                    await Promise.all(
-                        members.map(async (member) => {
-                            const publicKey = await getContactPublicKey(member.email);
-                            const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
-                            member.key = encryptedIdea;
-                        })
-                    );
-                    
-                    await updateDoc(groupRef, {
-                        messages: messages,
-                        members: members
-                    });
-        
-                }
+                // Atualizar Firestore
+                await updateDoc(groupRef, { messages, members });
+
+                // Logs para depuração
+                console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
+
+                Alert.alert("Sucesso", "A chave do grupo foi atualizada com sucesso!");
+
+                navigation.navigate('ChatGroup', {
+                    typeChat: 'group',
+                    groupName: newGroupName,
+                    groupId: groupId,
+                    groupCreator: groupCreator,
+                });
             }
-
-            Alert.alert("Sucesso", "A chave do grupo foi atualizada com sucesso!");
-
-            navigation.navigate('ChatGroup', {
-                typeChat: 'group',
-                groupName: newGroupName,
-                groupId: groupId, 
-                groupCreator: groupCreator,
-            });
-
         } catch (error) {
             Alert.alert("Erro", "Ocorreu um erro ao atualizar a chave do grupo.");
             console.error(error);
         }
-    }
-
-
-
-
-
-
-
-
+    };
 
     const leaveGroup = async () => {
         Alert.alert(
@@ -297,7 +328,7 @@ const EditGroup = ({ route }) => {
                 {
                     text: "Cancelar",
                     onPress: () => console.log("Exclusão cancelada"),
-                    style: "cancel", 
+                    style: "cancel",
                 },
                 {
                     text: "Sair/Excluir",
@@ -305,84 +336,93 @@ const EditGroup = ({ route }) => {
                         try {
                             const groupRef = doc(db, 'groups', groupId);
                             const groupSnap = await getDoc(groupRef);
-
+    
                             if (groupSnap.exists()) {
                                 const groupData = groupSnap.data();
-
-                                // REMOÇÃO DO MEMBRO
-                                var members = groupData.members || [];
-
+    
+                                // Estados iniciais
+                                const oldMembers = groupData.members || [];
+                                const oldMessages = groupData.messages || [];
+    
+                                let members = [...oldMembers]; // Clonando para modificar
+                                let messages = [...oldMessages]; // Clonando para modificar
+    
                                 // TROCA CHAVE IDEA
-                                const messages = groupData.messages || [];
                                 const ideaMember = members.find(member => member.email === user.email);
+                                if (!ideaMember) {
+                                    Alert.alert("Erro", "Você não está no grupo.");
+                                    return;
+                                }
+    
                                 const oldEncryptedIdea = ideaMember.key;
-                                const publicKey = await getMyPublicKey();
                                 const privateKey = await getPrivateKey();
                                 const oldDecryptedIdea = await descriptografarRSA(oldEncryptedIdea, privateKey);
-
                                 const newIdea = gerarChaveIDEA();
-                                const newKeyMembers = []
-
-                                if (messages) {
-                                    messages.forEach(message => {
-                                        if (message.content) {
-                                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
-                                            const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
-                                            message.content = toBase64(encryptedMessage);
-                                        }
-                                    });
-
-                                    await Promise.all(
-                                        members.map(async (member) => {
+    
+                                // Atualizar mensagens
+                                messages = messages.map(message => {
+                                    if (message.content) {
+                                        const decryptedMessage = descriptografarIDEA(
+                                            fromBase64(message.content),
+                                            fromBase64(oldDecryptedIdea)
+                                        );
+                                        const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
+                                        return { ...message, content: toBase64(encryptedMessage) };
+                                    }
+                                    return message;
+                                });
+    
+                                // Atualizar chaves dos membros
+                                members = await Promise.all(
+                                    members.map(async member => {
+                                        if (member.email !== user.email) {
                                             const publicKey = await getContactPublicKey(member.email);
                                             const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
-                                            member.key = encryptedIdea;
-                                        })
-                                    );
-                                    
-
-                                    await updateDoc(groupRef, {
-                                        messages: messages,
-                                        members: members
-                                    });
-                                }
-
-                                const memberToRemove = members.find(member => member.email === user.email);
-
+                                            return { ...member, key: encryptedIdea };
+                                        }
+                                        return member;
+                                    })
+                                );
+    
+                                // Atualizar o Firestore
+                                await updateDoc(groupRef, { messages, members });
+    
+                                // Remoção do membro atual
+                                const memberToRemove = oldMembers.find(member => member.email === user.email);
                                 if (memberToRemove) {
                                     await updateDoc(groupRef, {
                                         members: arrayRemove(memberToRemove)
                                     });
-
-                                    // Atualiza o estado local para remover o membro da lista
-                                    setGroupMembers(prevMembers => prevMembers.filter(member => member.email !== user.email));
-                                    members = members.filter(member => member.email !== memberToRemove.email);
-
-                                    
-
-                                    if ((groupData.members).length > 0 && memberToRemove.email === groupData.createdBy) {
-                                        await updateDoc(groupRef, {
-                                            createdBy: members[0].email
-                                        });
+    
+                                    if (groupData.createdBy === memberToRemove.email && members.length > 0) {
+                                        await updateDoc(groupRef, { createdBy: members[0].email });
                                     }
-
-                                    Alert.alert("Sucesso", "Você saiu deste grupo!");
+    
+                                    setGroupMembers(prevMembers => prevMembers.filter(member => member.email !== user.email));
                                 }
+    
+                                // Logs finais
+                                console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                                console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                                console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                                console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                                console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                                console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members.filter(member => member.email !== memberToRemove.email));
+    
+                                Alert.alert("Sucesso", "Você saiu do grupo.");
+                                navigation.pop(2);
                             }
-
-                            navigation.pop(2);
-
                         } catch (error) {
-                            console.error("Erro ao remover o membro:", error);
+                            console.error("Erro ao sair do grupo:", error);
                             Alert.alert("Erro", "Ocorreu um erro ao sair do grupo.");
                         }
                     },
-                    style: "destructive", 
+                    style: "destructive",
                 },
             ]
         );
     };
-
+    
     const criptografarRSA = async (message, publicKey) => {
         try {
             const encrypted = await Rsa.encrypt(message, publicKey);
@@ -429,20 +469,20 @@ const EditGroup = ({ route }) => {
     function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada, senderEmail) {
         const idea = new IDEA(chave);
         const descriptografada = idea.decrypt(criptografada);
-        console.log('\n\n');
-        console.log("\x1b[34m", "Email remetente:");
-        console.log(senderEmail);
-        console.log("\x1b[34m", "Mensagem criptografada:");
-        console.log(toBase64(criptografada));
-        console.log("\x1b[34m", "Chave IDEA criptografada:");
-        console.log(chaveCriptografada);
-        console.log("\x1b[34m", "Chave privada RSA:");
-        console.log(chavePrivada);
-        console.log("\x1b[34m", "Chave IDEA descriptografada:");
-        console.log(toBase64(chave));
-        console.log("\x1b[34m", "Mensagem descriptografada:");
-        console.log(descriptografada.toString('utf-8'));
-        console.log('\n\n');
+        // console.log('\n\n');
+        // console.log("\x1b[34m", "Email remetente:");
+        // console.log(senderEmail);
+        // console.log("\x1b[34m", "Mensagem criptografada:");
+        // console.log(toBase64(criptografada));
+        // console.log("\x1b[34m", "Chave IDEA criptografada:");
+        // console.log(chaveCriptografada);
+        // console.log("\x1b[34m", "Chave privada RSA:");
+        // console.log(chavePrivada);
+        // console.log("\x1b[34m", "Chave IDEA descriptografada:");
+        // console.log(toBase64(chave));
+        // console.log("\x1b[34m", "Mensagem descriptografada:");
+        // console.log(descriptografada.toString('utf-8'));
+        // console.log('\n\n');
 
         return descriptografada.toString('utf-8');
     }

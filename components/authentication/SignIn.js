@@ -35,8 +35,8 @@ const SignIn = () => {
             const user = userCredential.user;
 
             // Fazendo a requisição para o servidor
-            // const response = await axios.post('http://192.168.1.7:3000/generate-code', { email });
-            const response = await axios.post('http://192.168.119.206:3000/generate-code', { email });
+            const response = await axios.post('http://192.168.1.7:3000/generate-code', { email });
+            // const response = await axios.post('http://192.168.162.206:3000/generate-code', { email });
             //console.log('response',response)
             if(response.status === 200){
                 navigation.navigate('ConfirmCode', { userEmail: user.email, userPassword: user.password });

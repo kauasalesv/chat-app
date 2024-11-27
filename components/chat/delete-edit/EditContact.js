@@ -135,16 +135,6 @@ const EditContact = ({ route }) => {
         }); // Passa o tipo de chat, nome e e-mail do contato
     };
 
-
-
-
-
-
-
-
-
-
-
     const changeKey = async () => {
         try{
             // Cria o ID do documento com base nos e-mails do remetente e do destinatário
@@ -161,14 +151,17 @@ const EditContact = ({ route }) => {
             if (chatSnap1.exists()) {
                 const chatData = chatSnap1.data();
 
-                console.log(chatData[removeDot(user.email)]);
-
                 // TROCA CHAVE IDEA
-                const members = [
-                    { email: user.email, key: '' },
-                    { email: contactEmail, key: '' }
-                ];
-                const messages = chatData.messages || [];
+                // Estados iniciais
+                const oldMembers = [
+                    { email: user.email, key: chatData[removeDot(user.email)] },
+                    { email: contactEmail, key: chatData[removeDot(contactEmail)] }
+                ];                
+                const oldMessages = chatData.messages || [];
+
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+
                 const oldEncryptedIdea = chatData[removeDot(user.email)];
                 const publicKey = await getMyPublicKey();
                 const privateKey = await getPrivateKey();
@@ -178,39 +171,57 @@ const EditContact = ({ route }) => {
                 const newKeyMembers = [];
 
                 if (messages) {
-                    messages.forEach(message => {
+                    // Atualizar mensagens
+                    messages = messages.map(message => {
                         if (message.content) {
-                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
+                            const decryptedMessage = descriptografarIDEA(
+                                fromBase64(message.content),
+                                fromBase64(oldDecryptedIdea)
+                            );
                             const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
-                            message.content = toBase64(encryptedMessage);
+                            return { ...message, content: toBase64(encryptedMessage) };
                         }
+                        return message;
                     });
 
-                    await Promise.all(
-                        members.map(async (member) => {
+                    // Atualizar chaves dos membros
+                    members = await Promise.all(
+                        members.map(async member => {
                             const publicKey = await getContactPublicKey(member.email);
                             const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
-                            member.key = encryptedIdea;
+                            return { ...member, key: encryptedIdea };
                         })
                     );
-                    
+                
                     await updateDoc(chatRef1, {
                         [removeDot(user.email)]: members[0].key,
                         [removeDot(contactEmail)]: members[1].key,
                         messages: messages,
                     });
         
+                    // Logs para depuração
+                    console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+                    console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+                    console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+                    console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+                    console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+                    console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
+
                 }
             } else if (chatSnap2.exists()) {
                 const chatData = chatSnap2.data();
 
                 // TROCA CHAVE IDEA
-                const members = [
-                    { email: user.email, key: '' },
-                    { email: contactEmail, key: '' }
-                ];
-                
-                const messages = chatData.messages || [];
+                // Estados iniciais
+                const oldMembers = [
+                    { email: user.email, key: chatData[removeDot(user.email)] },
+                    { email: contactEmail, key: chatData[removeDot(contactEmail)] }
+                ];                
+                const oldMessages = chatData.messages || [];
+
+                let members = [...oldMembers]; // Clonando para modificar
+                let messages = [...oldMessages]; // Clonando para modificar
+
                 const oldEncryptedIdea = chatData[removeDot(user.email)];
                 const publicKey = await getMyPublicKey();
                 const privateKey = await getPrivateKey();
@@ -220,19 +231,25 @@ const EditContact = ({ route }) => {
                 const newKeyMembers = [];
 
                 if (messages) {
-                    messages.forEach(message => {
+                    // Atualizar mensagens
+                    messages = messages.map(message => {
                         if (message.content) {
-                            const decryptedMessage = descriptografarIDEA(fromBase64(message.content), fromBase64(oldDecryptedIdea), privateKey, oldEncryptedIdea, message.sender);
+                            const decryptedMessage = descriptografarIDEA(
+                                fromBase64(message.content),
+                                fromBase64(oldDecryptedIdea)
+                            );
                             const encryptedMessage = criptografarIDEA(decryptedMessage, newIdea);
-                            message.content = toBase64(encryptedMessage);
+                            return { ...message, content: toBase64(encryptedMessage) };
                         }
+                        return message;
                     });
 
-                    await Promise.all(
-                        members.map(async (member) => {
+                    // Atualizar chaves dos membros
+                    members = await Promise.all(
+                        members.map(async member => {
                             const publicKey = await getContactPublicKey(member.email);
                             const encryptedIdea = await criptografarRSA(toBase64(newIdea), publicKey);
-                            member.key = encryptedIdea;
+                            return { ...member, key: encryptedIdea };
                         })
                     );
                     
@@ -243,6 +260,14 @@ const EditContact = ({ route }) => {
                     });
 
             }
+
+            // Logs para depuração
+            console.log("\x1b[32m", "Estado inicial dos membros:", "\x1b[37m", oldMembers);
+            console.log("\x1b[32m", "Estado inicial da chave IDEA:", "\x1b[37m", oldDecryptedIdea);
+            console.log("\x1b[32m", "Estado inicial das mensagens:", "\x1b[37m", oldMessages);
+            console.log("\x1b[32m", "Estado final da chave IDEA:", "\x1b[37m", toBase64(newIdea));
+            console.log("\x1b[32m", "Estado final das mensagens (após modificação):", "\x1b[37m", messages);
+            console.log("\x1b[32m", "Estado final dos membros (após modificação):", "\x1b[37m", members);
         }
             Alert.alert("Sucesso", "A chave da conversa foi atualizada com sucesso!");
 
@@ -298,20 +323,20 @@ const EditContact = ({ route }) => {
     function descriptografarIDEA(criptografada, chave, chavePrivada, chaveCriptografada, senderEmail) {
         const idea = new IDEA(chave);
         const descriptografada = idea.decrypt(criptografada);
-        console.log('\n\n');
-        console.log("\x1b[34m", "Email remetente:");
-        console.log(senderEmail);
-        console.log("\x1b[34m", "Mensagem criptografada:");
-        console.log(toBase64(criptografada));
-        console.log("\x1b[34m", "Chave IDEA criptografada:");
-        console.log(chaveCriptografada);
-        console.log("\x1b[34m", "Chave privada RSA:");
-        console.log(chavePrivada);
-        console.log("\x1b[34m", "Chave IDEA descriptografada:");
-        console.log(toBase64(chave));
-        console.log("\x1b[34m", "Mensagem descriptografada:");
-        console.log(descriptografada.toString('utf-8'));
-        console.log('\n\n');
+        // console.log('\n\n');
+        // console.log("\x1b[34m", "Email remetente:");
+        // console.log(senderEmail);
+        // console.log("\x1b[34m", "Mensagem criptografada:");
+        // console.log(toBase64(criptografada));
+        // console.log("\x1b[34m", "Chave IDEA criptografada:");
+        // console.log(chaveCriptografada);
+        // console.log("\x1b[34m", "Chave privada RSA:");
+        // console.log(chavePrivada);
+        // console.log("\x1b[34m", "Chave IDEA descriptografada:");
+        // console.log(toBase64(chave));
+        // console.log("\x1b[34m", "Mensagem descriptografada:");
+        // console.log(descriptografada.toString('utf-8'));
+        // console.log('\n\n');
 
         return descriptografada.toString('utf-8');
     }
@@ -368,22 +393,6 @@ const EditContact = ({ route }) => {
     };
 
     const removeDot = (email) => email.replace(/\./g, ',');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     return (
         <ScrollView style={styles.editContactContainer}>

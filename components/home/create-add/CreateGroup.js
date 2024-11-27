@@ -22,8 +22,11 @@ const CreateGroup = () => {
 
     // Use useEffect para atualizar o estado caso selectedContacts mude
     useEffect(() => {
-        setGroupParticipants(selectedContacts);
+        if (JSON.stringify(groupParticipants) !== JSON.stringify(selectedContacts)) {
+            setGroupParticipants(selectedContacts);
+        }
     }, [selectedContacts]);
+    
 
     // Função para remover um participante
     const removeParticipant = (email) => {
