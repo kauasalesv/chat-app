@@ -10,8 +10,8 @@ const io = socketIo(server);
 const cors = require('cors');
  
 app.use(cors({
-    origin: 'http://192.168.1.7:8081', // Substitua pela origem do seu frontend
-    // origin: 'http://192.168.162.206:8081', // Substitua pela origem do seu frontend
+    // origin: 'http://192.168.1.7:8081', // Substitua pela origem do seu frontend
+    origin: 'http://192.168.171.206:8081', // Substitua pela origem do seu frontend
     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Métodos permitidos
     allowedHeaders: ['Content-Type', 'Authorization'], // Cabeçalhos permitidos
 }));

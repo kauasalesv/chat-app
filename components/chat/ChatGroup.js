@@ -14,8 +14,8 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-// const socket = io('http://192.168.162.206:3000');
-const socket = io('http://192.168.1.7:3000'); 
+const socket = io('http://192.168.171.206:3000');
+// const socket = io('http://192.168.1.7:3000'); 
 
 const IDEA = require("idea-cipher");
 
@@ -340,14 +340,14 @@ const ChatGroup = () => {
             // Verifica se o documento já existe
             const chatSnap = await getDoc(chatRef);
             const oneWeekInMillis = 7 * 24 * 60 * 60 * 1000; // Milissegundos em uma semana
-            const oneMinuteInMillis = 1 * 60 * 1000; // Milissegundos em um minuto
+            const oneMinuteInMillis = 0.5 * 60 * 1000; // Milissegundos em um minuto
             const currentTime = Timestamp.now();
             
             if (chatSnap.exists()) {
                 // O documento já existe
-                const existingTime = chatSnap.data().time;
+                const existingTime = chatSnap.data().oldTime;
             
-                if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneWeekInMillis) {
+                if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneMinuteInMillis) {
                     await changeKey();
                 }
             }

@@ -432,15 +432,10 @@ const EditContact = ({ route }) => {
                         <Text style={styles.editContactButtonChatup}>Conversar</Text>
                     </TouchableOpacity>
 
-
-
-                    <TouchableOpacity style={styles.editContactButtonChatup} onPress={changeKey}>
+                    {/* <TouchableOpacity style={styles.editContactButtonChatup} onPress={changeKey}>
                         <Text style={styles.editContactButtonChatup}>Teste Trocar Chave</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
 
-
-
-                    
                 </View>
             </View>
 

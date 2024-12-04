@@ -70,8 +70,8 @@ const SignUp = () => {
                 // Substitui a tela de cadastro pela tela "Home"
                 //navigation.replace('Home', { userEmail: user.email, userId: user.uid });
 
-                const response = await axios.post('http://192.168.1.7:3000/generate-code', { email });
-                // const response = await axios.post('http://192.168.162.206:3000/generate-code', { email });
+                // const response = await axios.post('http://192.168.1.7:3000/generate-code', { email });
+                const response = await axios.post('http://192.168.171.206:3000/generate-code', { email });
 
                 //console.log('response',response)
                 if(response.status===200){

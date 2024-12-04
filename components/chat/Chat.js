@@ -5,6 +5,7 @@ import { auth, db } from '../../config/firebase';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Buffer } from 'buffer';
 import { TextDecoder } from 'text-encoding';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Rsa from 'react-native-rsa-native';
 import * as Keychain from 'react-native-keychain';
 import io from 'socket.io-client';
@@ -14,8 +15,8 @@ import ChatUpBar from '../layout/ChatUpBar';
 import ChatMessages from './ChatMessages';
 import ChatBottomBar from '../layout/ChatBottomBar';
 
-// const socket = io('http://192.168.162.206:3000');
-const socket = io('http://192.168.1.7:3000'); 
+const socket = io('http://192.168.171.206:3000');
+// const socket = io('http://192.168.1.7:3000'); 
 
 const IDEA = require("idea-cipher");
 
@@ -108,6 +109,22 @@ const Chat = () => {
             time: new Date() // Adiciona um timestamp
         };
         setMessages((prevMessages) => [...prevMessages, newMessage]); // Adiciona a mensagem ao estado
+
+        const chatDocId1 = `${contactEmail}:${auth.currentUser.email}`;
+        const chatDocId2 = `${auth.currentUser.email}:${contactEmail}`;
+
+        const chatRef1 = doc(db, 'chats', chatDocId1);
+        const chatRef2 = doc(db, 'chats', chatDocId2);
+
+        const chatSnap1 = await getDoc(chatRef1);
+        const chatSnap2 = await getDoc(chatRef2);
+
+        if (chatSnap1.exists()) {
+            saveMessagesLocally(chatDocId1, messages)
+
+        } else if (chatSnap2.exists()) {
+            saveMessagesLocally(chatDocId2, messages)
+        }
 
         const userEmail = auth.currentUser.email;
         const myPriviteKey = await getPrivateKey(user.uid);
@@ -429,14 +446,14 @@ const Chat = () => {
             // Verifica se o documento já existe
             const chatSnap = await getDoc(chatRef);
             const oneWeekInMillis = 7 * 24 * 60 * 60 * 1000; // Milissegundos em uma semana
-            const oneMinuteInMillis = 1 * 60 * 1000; // Milissegundos em um minuto
+            const oneMinuteInMillis = 0.5 * 60 * 1000; // Milissegundos em um minuto
             const currentTime = Timestamp.now();
             
             if (chatSnap.exists()) {
                 // O documento já existe
-                const existingTime = chatSnap.data().time;
+                const existingTime = chatSnap.data().oldTime;
             
-                if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneWeekInMillis) {
+                if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneMinuteInMillis) {
                     await changeKey();
                 }
             }
@@ -588,6 +605,26 @@ const Chat = () => {
         }
     }
 
+    const loadMessagesFromLocal = async (chatId) => {
+        try {
+            const storedMessages = await AsyncStorage.getItem(`chat_${chatId}`);
+            const messages = storedMessages ? JSON.parse(storedMessages) : []
+            console.log("AAA", messages);
+            return messages;
+        } catch (error) {
+            console.error("Erro ao carregar mensagens locais:", error);
+            return [];
+        }
+    };
+
+    const saveMessagesLocally = async (chatId, messages) => {
+        try {
+            await AsyncStorage.setItem(`chat_${chatId}`, JSON.stringify(messages));
+        } catch (error) {
+            console.error("Erro ao salvar mensagens localmente:", error);
+        }
+    };
+
     // Função para converter Uint8Array ou Buffer para base64
     function toBase64(data) {
         return Buffer.from(data).toString('base64');
@@ -626,6 +663,7 @@ const Chat = () => {
 
     useEffect(() => {
         loadMessages();
+        loadMessagesFromLocal(`${user.email}:${contactEmail}`);
         getPrivateKey(user.uid);
         periodicChangeKey(user);
     }, []);

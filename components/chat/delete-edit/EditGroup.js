@@ -394,9 +394,11 @@ const EditGroup = ({ route }) => {
                                         members: arrayRemove(memberToRemove)
                                     });
     
-                                    if (groupData.createdBy === memberToRemove.email && members.length > 0) {
-                                        await updateDoc(groupRef, { createdBy: members[0].email });
-                                    }
+                                    const newCreator = members.find(member => member.email !== memberToRemove.email);
+
+                                    if (groupData.createdBy === memberToRemove.email && newCreator) {
+                                        await updateDoc(groupRef, { createdBy: newCreator.email });
+                                    }                                    
     
                                     setGroupMembers(prevMembers => prevMembers.filter(member => member.email !== user.email));
                                 }
@@ -617,16 +619,9 @@ const EditGroup = ({ route }) => {
                         <Text style={styles.editGroupButtonTittle}>Sair/Excluir</Text>
                     </TouchableOpacity>
 
-
-
-
-                    <TouchableOpacity style={styles.createGroupSaveButton} onPress={changeKey}>
+                    {/* <TouchableOpacity style={styles.createGroupSaveButton} onPress={changeKey}>
                         <Text style={styles.createGroupButtonTittle}>Teste Troca Chave</Text>
-                    </TouchableOpacity>
-
-
-
-
+                    </TouchableOpacity> */}
 
                 </View>
             </View>

@@ -24,8 +24,8 @@ import ConfirmationMessage from './components/layout/ConfirmationMessage';
 import ConfirmCode from './components/authentication/ConfirmCode';
 
 const Stack = createStackNavigator();
-// const socket = io('http://192.168.162.206:3000');
-const socket = io('http://192.168.1.7:3000'); 
+const socket = io('http://192.168.171.206:3000');
+// const socket = io('http://192.168.1.7:3000'); 
 
 export default function App() {
   useEffect(() => {
@@ -89,17 +89,17 @@ export default function App() {
             // O documento já existe
             const existingTime = chatSnap.data().time;
         
-            if (existingTime && currentTime.toMillis() - existingTime.toMillis() > oneWeekInMillis) {
-                // O time existente é inferior a uma semana do atual, atualize o time
+            if (existingTime) {
                 await updateDoc(chatRef, {
+                    oldTime: existingTime,
                     time: currentTime,
                 });
-            } else {
-                console.log("O time atual não é inferior a uma semana do time existente.");
-            }
+            } 
+
         } else {
             // O documento não existe, cria um novo
             await setDoc(chatRef, {
+                oldTime: currentTime,
                 time: currentTime,
             });
         }        
